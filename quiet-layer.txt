@@ -1,0 +1,441 @@
+[Adblock Plus 2.0]
+! Title: Hyugin · Quiet Layer
+! Description: Personal ABP-syntax ruleset (AdGuard, uBO-compatible lists, etc.)—cosmetics, hand-picked network blocks, and redirect cuts.
+! Homepage: https://github.com/hyugin/quiet-layer
+! RAW: https://raw.githubusercontent.com/hyugin/quiet-layer/main/quiet-layer.txt
+! Version: 1.34
+! Last modified: 2026-04-18
+! Expires: 1 day
+
+! ========================================
+! REDDIT - ADS & ANNOYANCES
+! ========================================
+
+! Hide Reddit ads/promoted UI elements
+! Hide Reddit links in search results
+##a[href*="reddit.com"]
+##a[href*="redd.it"]
+
+! Promoted posts in feed
+reddit.com##[data-testid="post-container"]:has([data-click-id="promoted"])
+reddit.com##[data-promoted="true"]
+reddit.com##.promotedlink
+reddit.com##[data-type="promoted"]
+
+! Sponsored content markers
+reddit.com##.promoted-tag
+reddit.com##[data-testid="post-container"]:has-text(/promoted/i)
+reddit.com##[data-testid="post-container"]:has-text(/sponsored/i)
+
+! Reddit Premium prompts
+reddit.com##[data-testid="premium-banner"]
+reddit.com##.premium-banner-large
+reddit.com##[data-testid="premium-upsell"]
+
+! Sidebar ads
+reddit.com##[data-testid="subreddit-sidebar"] [data-testid="promoted-post"]
+reddit.com##.side-container .promoted
+
+! Mobile ads
+reddit.com##[data-testid="post-container"]:has([data-adclicklocation])
+reddit.com##.Post:has([data-promoted])
+
+! Cookie banner
+reddit.com##[data-testid="cookie-banner"]
+reddit.com##.cookie-banner
+
+! App download prompts
+reddit.com##[data-testid="app-banner"]
+reddit.com##.app-banner
+reddit.com##[data-testid="xpromo-banner"]
+reddit.com##.XPromoPopup
+
+! Login/signup prompts
+reddit.com##[data-testid="login-prompt"]
+reddit.com##.login-required-overlay
+reddit.com##[data-testid="blocking-modal"]
+
+! Avatar shop prompts
+reddit.com##[data-testid="avatar-shop-banner"]
+reddit.com##.avatar-upsell
+
+! Community recommendations
+reddit.com##[data-testid="community-recommendations"]
+reddit.com##.recommended-communities
+
+! Chat suggestions
+reddit.com##[data-testid="chat-suggestions"]
+
+! Old Reddit promoted posts
+old.reddit.com##.promoted
+old.reddit.com##.organic-listing .promoted .usertext
+
+! Old Reddit sidebar ads
+old.reddit.com##.ad-container
+old.reddit.com##.sponsorshipbox
+old.reddit.com##[id*="siteTable_organic"]
+
+! Generic Reddit ad selectors
+reddit.com##[class*="promoted"]:not([class*="non-promoted"])
+reddit.com##[id*="promoted"]
+reddit.com##[data-promoted]
+reddit.com##[href*="ads.reddit.com"]
+
+! Remove elements with ad-related text content
+reddit.com##*:has-text(/^promoted$/i)
+reddit.com##*:has-text(/^sponsored$/i)
+reddit.com##*:has-text(/^advertisement$/i)
+
+
+! ========================================
+! SPOTIFY - HOME FILTERS
+! ========================================
+
+! Hide home filter carousel (All, Music, Podcasts, Audiobooks)
+open.spotify.com##div[data-testid="carousel-scroller"][aria-label*="Home Filters"]
+open.spotify.com##div[role="list"][data-testid="carousel-scroller"][aria-label="Home Filters"]
+
+! Hide individual filter buttons
+open.spotify.com##button[aria-label="All"]
+open.spotify.com##button[aria-label="Music"]
+open.spotify.com##button[aria-label="Podcasts"]
+open.spotify.com##button[aria-label="Audiobooks"]
+open.spotify.com##button.e-10451-legacy-chip[role="checkbox"]
+
+! Hide "Friend Activity" button
+open.spotify.com##button[data-testid="friend-activity-button"]
+open.spotify.com##button[aria-label="Friend Activity"]
+open.spotify.com##button[data-restore-focus-key="buddy_feed"]
+
+! Hide "What's New" button
+open.spotify.com##button[data-testid="whats-new-feed-button"]
+open.spotify.com##button[aria-label="What's New"]
+
+! Hide "Good [time]" shortcuts section
+open.spotify.com##section[aria-label="Good morning"]
+open.spotify.com##section[aria-label="Good afternoon"]
+open.spotify.com##section[aria-label="Good evening"]
+
+! Hide "Related music videos" section
+open.spotify.com##div:has(> div:has(> h2:has-text(/Related music videos/i)))
+open.spotify.com##div[aria-label="Related music videos"]
+open.spotify.com##div[data-testid="carousel-scroller"][aria-label="Related music videos"]
+open.spotify.com##div[role="grid"][aria-label="Related music videos"]
+open.spotify.com##div:has([data-testid="carousel-scroller"][aria-label="Related music videos"])
+
+! Hide "Credits" section
+open.spotify.com##div:has(> div:has(> h2:has-text(/^Credits$/i)))
+open.spotify.com##div:has(h2:has-text(/^Credits$/i))
+open.spotify.com##div:has(> div > h2:has-text(/^Credits$/i) + button:has-text(/^Show all$/i))
+open.spotify.com##div:has([data-encore-id="listRow"]:has([data-encore-id="listRowSubtitle"]:has-text(/^Main Artist$/i)))
+open.spotify.com##div:has([data-encore-id="listRow"][draggable="true"]:has(button:has-text(/^Follow$/i)))
+
+! Hide sidebar artists section
+open.spotify.com##div[class*="artist"] a[href*="/artist/"]
+open.spotify.com##div[class*="sidebar"] a[href*="/artist/"]
+open.spotify.com##div[class*="library"] a[href*="/artist/"]
+
+! Hide individual artist list rows
+open.spotify.com##div[role="row"]:has([id*="listrow-title-spotify:artist:"])
+open.spotify.com##div[role="row"]:has([id*="listrow-subtitle-spotify:artist:"])
+open.spotify.com##div[role="row"]:has(p[data-encore-id="listRowSubtitle"]:has-text(/Artist$/i))
+open.spotify.com##div[role="gridcell"]:has([data-testid="entity-image"])
+open.spotify.com##div[role="gridcell"]:has([id*="listrow-title-spotify:artist:"])
+open.spotify.com##div[role="gridcell"]:has([id*="listrow-subtitle-spotify:artist:"])
+open.spotify.com##div[role="gridcell"]:has(p[data-encore-id="listRowSubtitle"]:has-text(/Artist$/i))
+open.spotify.com##.e-10451-legacy-list-row:has([data-testid="entity-image"])
+open.spotify.com##.e-10451-legacy-list-row:has([id*="listrow-title-spotify:artist:"])
+open.spotify.com##.e-10451-legacy-list-row:has(p[data-encore-id="listRowSubtitle"]:has-text(/Artist$/i))
+open.spotify.com##div[data-encore-id="listRow"]:has([data-testid="entity-image"])
+open.spotify.com##div[data-encore-id="listRow"]:has([id*="listrow-title-spotify:artist:"])
+open.spotify.com##div[data-encore-id="listRow"]:has(p[data-encore-id="listRowSubtitle"]:has-text(/Artist$/i))
+
+! ========================================
+! YOUTUBE - SHORTS, MIXES & CLUTTER
+! ========================================
+
+! Hide the text label of the dislike/share/download/report/save buttons
+www.youtube.com###actions.ytd-watch-metadata button > div[class$="text-content"]:not(:has-text(/[\d]/))
+www.youtube.com###actions.ytd-watch-metadata ytd-button-renderer .yt-spec-button-shape-next .yt-spec-button-shape-next--button-text-content
+www.youtube.com###actions.ytd-watch-metadata ytd-button-renderer .yt-spec-button-shape-next__icon:style(margin-right: -6px !important; margin-left: -6px !important;)
+m.youtube.com##ytm-slim-video-action-bar-renderer button [class*="button-text-content"]:not(:has-text(/\d/))
+m.youtube.com##ytm-slim-video-action-bar-renderer ytm-button-renderer div[class$="icon"]:style(margin-right: -6px !important; margin-left: -6px !important;)
+
+! Hide View Products
+www.youtube.com##.ytp-suggested-action-badge-expanded
+
+! Hide Includes paid promotion
+www.youtube.com##.ytp-paid-content-overlay
+
+! Hide upcoming Youtube videos
+www.youtube.com##ytd-browse ytd-grid-video-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"])
+www.youtube.com##ytd-browse ytd-rich-item-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"])
+www.youtube.com##ytd-browse[page-subtype="subscriptions"] ytd-video-renderer ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"]:upward(ytd-item-section-renderer)
+
+! Brand image in the corner
+youtube.com##.ytp-button.branding-img-container
+
+! Hide Verified checkmark
+www.youtube.com##.ytd-badge-supported-renderer.style-scope.badge-style-type-verified.badge
+www.youtube.com##.ytd-comment-renderer #author-text:remove-attr(hidden)
+www.youtube.com##.ytd-comment-renderer #author-comment-badge
+
+! Hide badges (such as "New") under video recommendations on the sidebar
+www.youtube.com##ytd-video-meta-block + ytd-badge-supported-renderer
+
+! Hide "smartimation" animations
+www.youtube.com##yt-smartimation > *:not(.smartimation__content)
+
+! Prevent stats from live-updating
+||youtube.com/youtubei/v1/updated_metadata
+
+! Hide the hashtags above the video title
+www.youtube.com###description #info a[href^="/hashtag/"]
+www.youtube.com###super-title
+www.youtube.com##.super-title
+m.youtube.com##.standalone-collection-badge a[href^="/hashtag/"]
+m.youtube.com##ytm-video-description-header-renderer button-view-model a[href^="/hashtag/"]
+
+! Hide the copyright notice in the video description
+www.youtube.com###description .ytd-watch-metadata #items:has(.ytd-video-description-music-section-renderer)
+m.youtube.com##ytm-video-description-music-section-renderer
+
+! Hide Youtube mixes and radios
+! Removes Mixes from the Main Page
+youtube.com##ytd-rich-item-renderer:has([href$="start_radio=1"])
+! Removes Mixes from the right side panel
+youtube.com##ytd-compact-radio-renderer
+! Removes Mixes from the right side panel (Dec 2024)
+youtube.com###related yt-lockup-view-model:has([href*="&start_radio=1&"])
+! Removes Mixes from search results
+youtube.com##ytd-radio-renderer
+! Removes Mixes from search results (Dec 2024)
+youtube.com##ytd-search yt-lockup-view-model:has([href$="&start_radio=1"][aria-label])
+! Removes Mixes from Video End Cards
+youtube.com##.ytp-videowall-still[data-is-mix="true"]
+! Removes "YouTube" (Music) playlists from the right side panel
+youtube.com##ytd-compact-playlist-renderer:has([title^="YouTube"])
+
+! Hide Shorts
+! YT Homepage and Subscriptions (Grid View) - Hide the Shorts section
+youtube.com##[is-shorts]
+! YT Menu - Hide the Shorts button
+www.youtube.com###guide [title="Shorts"], .ytd-mini-guide-entry-renderer[title="Shorts"]
+! YT Search - Hide Shorts
+www.youtube.com##ytd-search ytd-video-renderer:has([overlay-style="SHORTS"])
+! YT Search, Channels, Subscriptions (List View) and Sidebar/Below Player Recommendations - Hide the Shorts sections
+www.youtube.com##ytd-reel-shelf-renderer
+! YT Channels - Hide the Shorts tab
+www.youtube.com##[tab-title="Shorts"]
+! YT Subscriptions - Hide Shorts - Grid View
+www.youtube.com##ytd-browse[page-subtype="subscriptions"] ytd-grid-video-renderer:has([overlay-style="SHORTS"])
+! YT Subscriptions - Hide Shorts - List View
+www.youtube.com##ytd-browse[page-subtype="subscriptions"] ytd-video-renderer:has([overlay-style="SHORTS"])
+! YT Subscriptions - New Layout - Hide Shorts
+www.youtube.com##ytd-browse[page-subtype="subscriptions"] ytd-rich-item-renderer:has([overlay-style="SHORTS"])
+! YT Sidebar - Hide Shorts
+www.youtube.com###related ytd-compact-video-renderer:has([overlay-style="SHORTS"])
+! YT Mobile - Hide the Shorts Menu button
+m.youtube.com##ytm-pivot-bar-item-renderer:has(>.pivot-shorts)
+! YT Mobile - Hide the Shorts sections
+m.youtube.com##ytm-reel-shelf-renderer
+m.youtube.com##ytm-rich-section-renderer:has([d^="M17.77,10.32l-1.2"])
+! YT Mobile - Hide Shorts in search results
+m.youtube.com##ytm-search ytm-video-with-context-renderer:has([data-style="SHORTS"])
+! YT Mobile - Hide the Shorts button on Channels
+m.youtube.com##[tab-title="Shorts"]
+
+! ========================================
+! GENERAL WEB ANNOYANCES
+! ========================================
+! NOTE: For cookie/GDPR banners, use the "AdGuard Annoyances" or
+! "EasyList Cookie" filter lists instead of broad wildcard selectors.
+! The rules below target specific known widgets.
+
+! Intercom chat widget
+##[id*="intercom-container"]
+##.intercom-lightweight-app
+
+! Zendesk chat widget
+##[id*="zendesk"][id*="launcher"]
+##iframe[id*="launcher"][title*="chat"]
+
+! Drift chat widget
+##[id="drift-widget-container"]
+
+! Crisp chat widget
+##[class*="crisp-client"]
+
+! HubSpot chat widget
+##[id="hubspot-messages-iframe-container"]
+
+! Newsletter and email signup popups
+##[class*="newsletter-popup"]
+##[class*="newsletter-modal"]
+##[class*="email-signup-modal"]
+##[class*="subscribe-modal"]
+
+! Notification permission prompts
+##[class*="notification-prompt"]
+##[class*="push-notification"]
+
+! Survey and feedback widgets
+##[id*="survicate"]
+##[id*="hotjar"]
+##[class*="qualaroo"]
+
+! ========================================
+! SITE SPECIFIC ANNOYANCES
+! ========================================
+
+! Twitter/X promoted content
+x.com##[data-testid="cellInnerDiv"]:has([data-testid="promotedIndicator"])
+x.com##[data-testid="placementTracking"]
+
+! LinkedIn promoted posts
+linkedin.com##.feed-shared-update-v2:has(.update-components-actor__description:has-text(/Promoted/))
+linkedin.com##main .feed-shared-update-v2:has(span:has-text(/^Promoted$/))
+
+! Facebook sponsored posts
+! NOTE: Facebook's DOM changes frequently; these may need updating
+facebook.com##[role="article"]:has(a[aria-label="Sponsored"] , a[href*="ad_id="])
+facebook.com##[role="feed"] div:has(> [data-pagelet^="FeedUnit"]):has(a[aria-label="Sponsored"])
+
+! Instagram sponsored posts
+! NOTE: Instagram's DOM changes frequently; these may need updating
+instagram.com##article:has(span:has-text(/^Sponsored$/))
+instagram.com##div[role="presentation"]:has(span:has-text(/^Sponsored$/))
+
+! Amazon sponsored product listings
+amazon.com##.s-result-item:has(span:has-text(/^Sponsored$/))
+amazon.com##.s-result-item[data-component-type="sp-sponsored-result"]
+amazon.com##div[data-component-type="sp-sponsored-result"]
+! Amazon search top/bottom banner ads
+amazon.com##.AdHolder
+amazon.com##div[data-component-type="s-impression-counter"]
+! Amazon product page sponsored recommendations
+amazon.com##div[cel_widget_id*="sp-sponsored"]
+amazon.com###sp_detail
+amazon.com###sp_detail2
+amazon.com##div[data-component-type="sp-sponsored-result"][data-cel-widget*="search"]
+! Amazon "Brands related to this category"
+amazon.com##div[cel_widget_id*="brand-carousel"]
+! Amazon "Highly rated" sponsored shelves
+amazon.com##div[cel_widget_id*="MAIN-FEATURED_ASINS"]
+
+! ========================================
+! TARGETED GOOGLE AUTO-LOGIN POPUP BLOCKING
+! ========================================
+
+! Block Google One Tap auto-login scripts (the main culprits)
+||accounts.google.com/gsi/client$script,third-party
+||accounts.google.com/gsi/button$script,third-party
+
+! Block Google One Tap auto-appearing elements (specific to auto-login)
+##div[data-g-one-tap]
+##div[id^="g_id_onload"]
+##div[class*="g_id_signin"]
+##div[jsname="V68bde"]
+
+! Block auto-credential picker overlays (not user-initiated ones)
+##div[id*="credential_picker_container"]:not(:hover)
+##div[class*="credential_picker"]:not([role="button"])
+
+! Block Google Smart Lock auto-prompts
+##div[data-smartlock-enabled="true"]
+##div[class*="smartlock-prompt"]
+
+! Block specific auto-appearing Google auth containers
+##div[data-client-id][data-auto_prompt="true"]
+##div[data-client-id][data-callback]:not([data-theme])
+
+! Block auto-prompting Google signin iframes (not embedded buttons)
+##iframe[src*="accounts.google.com/gsi"]:not([width])
+
+! Block Google account chooser when it auto-appears
+##div[data-account-chooser-dialog][style*="display: block"]
+
+! Block specific intrusive Google auth iframes
+##iframe[src*="accounts.google.com/gsi"]
+
+! ========================================
+! TARGETED NETWORK — AD SCRIPT DOMAINS (filtering log)
+! ========================================
+! Third-party scripts: turbostats.xyz/blackhole.js, adv*.clickadu.net/*.js
+||turbostats.xyz^
+||clickadu.net^
+
+! TrafficJunky (Base: ||trafficjunky.com^$third-party, ||trafficjunky.net^)
+||trafficjunky.com^$third-party
+||trafficjunky.net^
+
+! Redirect / link broker (e.g. s.* /v1/link.php?idzone=…)
+||opoxv.com^
+
+! ads_batch API on any host (pattern ends before $; options = xmlhttprequest + script)
+! NOTE: Any site using this path is affected — remove if it breaks a legit app.
+/_xa/ads_batch?ads=$xmlhttprequest,script
+
+! ========================================
+! SCAM / REDIRECT HOPS & CLICK INFRA (curated from AdGuard Base)
+! ========================================
+! Ref: BaseFilter/sections/general_url.txt (redirects, click.php, zone hops, popunders)
+!      https://github.com/AdguardTeam/AdguardFilters/blob/master/BaseFilter/sections/general_url.txt
+!      Host+path examples: ||redtube.com/_xa/ in specific.txt
+! $all = AdGuard: all resource types. Trim rules if something legitimate breaks.
+!
+! Disposable / typosquat hop hosts (add ||evil.host^ from your filtering log as they appear)
+||klrtspet.net^
+! Opaque middle-hop path (e.g. /_x/<base64>…)
+/_x/*$document,popup
+! Redirect broker (Base adservers.txt)
+||smart-redirecting.com^$third-party
+
+! --- document / $all redirect chains (Base general_url) ---
+/click.php?key=*&creative_id=$document
+/click.php?key=*&click_id=$document
+/click.php?key=*&zone_id=$document
+/?tm=1&subid4=*&kw=$all
+/page/bouncy.php?&bpae=*&redirectType=js&inIframe=$all
+errx01USAHTML/?bcda=$document
+/?rb=*&zoneid=$all,third-party
+&rb=*&zoneid=$all
+&zoneid=*&rb=$all,third-party
+/?request_ab*&zoneid=*&rb=$all
+/?uclick=*&uclickhash=$all
+.com/click/?ct=*&cu=$all
+/?z=*&syncedCookie=true&rhd=false$all
+/in/p/?spot_id=$document,popup
+/server-side/amsweb.php?$document
+.php?key=*&camp_id=$all
+/click?key=*CPA&$all
+click?pid=*&sub2=Clickunder$all
+?dovr=true|$document,popup
+/direct-link?pubid=$all
+.com/redirect-zone/$all
+.com/afu.php?zoneid=$all
+/?pid=*&subid=*&clickid=$popup
+/?tag=*&clickid=*&subid=$popup
+.click/?ip=$popup
+/redirect-ads.php$all
+/cu.php?s=$popup
+/player_embed_cu.php?s=$popup
+/cuid/?f=https%$xmlhttprequest,third-party
+.icu/*?zoneid=*&visitor_id=$all
+/?scontext_r=*&nrb=$all
+&pbsubid=*&noads=$all
+.doc?t=popunder$all
+/?t=popunder&$all
+.doc?f=1&sid=$all
+/?&pid=*&subid=$all
+/?&subid=*&pid=$all
+?tid=*&red=1&*&abt=$all
+&tid=*&red=1&abt=$all
+/submit.min.js?abvar=$all
+
+! ========================================
+! AD TEST & MISC
+! ========================================
+
+d3ward.github.io##.adbox.banner_ads.adsbox
+d3ward.github.io##.textads
