@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.0.1
+// @version      1.0.2
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.so/*
@@ -9,6 +9,11 @@
 // @match        https://*.notion.so/*
 // @match        https://*.notion.site/*
 // @match        https://notion.site/*
+// @include      *://www.notion.so/*
+// @include      *://notion.so/*
+// @include      *://*.notion.so/*
+// @include      *://*.notion.site/*
+// @include      *://notion.site/*
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -16,13 +21,17 @@
 /*
  * Runs inside AdGuard for Mac's built-in userscript manager (not a browser
  * extension). Paste into AdGuard → Extensions → +. Requires AdGuard protection
- * and HTTPS filtering for notion.so / notion.site in the browser you use
- * (including Firefox / Zen).
+ * and HTTPS filtering for notion.so / notion.site.
+ *
+ * Zen Browser: AdGuard does not always filter Zen by default. Add Zen in
+ * AdGuard → Settings → Network → filtered applications (+ → Zen.app), then
+ * fully close Notion tabs and reopen. Confirm in DevTools console:
+ *   [Notion Locked Launcher] active
  *
  * Usage
  * -----
  * 1. Open Notion → go to your launcher page (e.g. Tasks database).
- * 2. Click “🔓 Lock this tab” (bottom-right) or press Cmd+Shift+L.
+ * 2. Click “🔓 Lock this tab” (top-right) or press Cmd+Shift+L.
  * 3. Sidebar / page / relation links open in a NEW tab; this tab stays put.
  * 4. Unlock with the same control or shortcut.
  *
@@ -84,8 +93,15 @@
     if (!DEBUG) return;
     var args = Array.prototype.slice.call(arguments);
     args.unshift('[Notion Locked Launcher]');
-    console.log.apply(console, args);
+    try {
+      console.log.apply(console, args);
+    } catch (e) { /* ignore */ }
   }
+
+  // Always announce once so Zen/AdGuard injection can be verified in DevTools.
+  try {
+    console.info('[Notion Locked Launcher] active — Cmd+Shift+L to lock/unlock');
+  } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
   // Host / URL helpers
@@ -209,13 +225,13 @@
     style.id = 'nll-toast-style';
     style.textContent =
       '#' + UI_ROOT_ATTR + '-toast{' +
-        'position:fixed;bottom:56px;right:16px;z-index:2147483646;' +
+        'position:fixed;top:52px;right:12px;z-index:2147483646;' +
         'max-width:min(320px,calc(100vw - 32px));' +
         'padding:10px 14px;border-radius:8px;' +
         'background:rgba(15,15,15,.92);color:#f7f6f3;' +
         'font:13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;' +
         'box-shadow:0 4px 18px rgba(0,0,0,.25);' +
-        'opacity:0;transform:translateY(6px);' +
+        'opacity:0;transform:translateY(-6px);' +
         'transition:opacity .18s ease,transform .18s ease;' +
         'pointer-events:none;' +
       '}' +
@@ -251,54 +267,61 @@
   // Floating toggle UI
   // ---------------------------------------------------------------------------
 
+  var TOGGLE_ID = 'nll-lock-toggle';
+
+  /** Inline styles survive Notion style resets better than a stylesheet alone. */
+  function applyToggleInlineStyles(btn, locked) {
+    btn.style.cssText = [
+      'position:fixed',
+      'top:12px',
+      'right:12px',
+      'z-index:2147483647',
+      'display:inline-flex',
+      'align-items:center',
+      'gap:6px',
+      'padding:8px 12px',
+      'margin:0',
+      'border:1px solid ' + (locked ? 'rgba(35,131,226,.45)' : 'rgba(55,53,47,.22)'),
+      'border-radius:999px',
+      'cursor:pointer',
+      'user-select:none',
+      '-webkit-user-select:none',
+      'background:' + (locked ? 'rgba(35,131,226,.18)' : 'rgba(255,255,255,.96)'),
+      'color:' + (locked ? '#0B6BCB' : '#37352f'),
+      'font:12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+      'box-shadow:0 2px 12px rgba(15,15,15,.18)',
+      'backdrop-filter:blur(8px)',
+      '-webkit-backdrop-filter:blur(8px)',
+      'pointer-events:auto',
+      'opacity:1',
+      'visibility:visible',
+      'transform:none'
+    ].join(';');
+  }
+
   function ensureToggleStyles(doc) {
     if (doc.getElementById('nll-toggle-style')) return;
     var style = doc.createElement('style');
     style.id = 'nll-toggle-style';
     style.textContent =
-      '#' + UI_ROOT_ATTR + '-toggle{' +
-        'position:fixed;bottom:16px;right:16px;z-index:2147483647;' +
-        'display:inline-flex;align-items:center;gap:6px;' +
-        'padding:8px 12px;border:1px solid rgba(55,53,47,.16);' +
-        'border-radius:999px;cursor:pointer;user-select:none;' +
-        'background:rgba(255,255,255,.92);color:#37352f;' +
-        'font:12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;' +
-        'box-shadow:0 2px 10px rgba(15,15,15,.12);' +
-        'backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);' +
-        'transition:background .15s ease,border-color .15s ease,color .15s ease;' +
+      '#' + TOGGLE_ID + '{' +
+        'position:fixed!important;top:12px!important;right:12px!important;' +
+        'z-index:2147483647!important;pointer-events:auto!important;' +
       '}' +
-      '#' + UI_ROOT_ATTR + '-toggle:hover{' +
-        'background:#fff;border-color:rgba(55,53,47,.28);' +
-      '}' +
-      '#' + UI_ROOT_ATTR + '-toggle.nll-locked{' +
-        'background:rgba(35,131,226,.12);border-color:rgba(35,131,226,.35);' +
-        'color:#0B6BCB;' +
-      '}' +
-      '@media (prefers-color-scheme: dark){' +
-        '#' + UI_ROOT_ATTR + '-toggle{' +
-          'background:rgba(37,37,37,.92);color:#e8e7e4;' +
-          'border-color:rgba(255,255,255,.14);' +
-        '}' +
-        '#' + UI_ROOT_ATTR + '-toggle:hover{background:#2f2f2f;}' +
-        '#' + UI_ROOT_ATTR + '-toggle.nll-locked{' +
-          'background:rgba(35,131,226,.22);border-color:rgba(35,131,226,.45);' +
-          'color:#79b8ff;' +
-        '}' +
-      '}';
+      '#' + UI_ROOT_ATTR + '-toast{pointer-events:none!important;}';
     (doc.head || doc.documentElement).appendChild(style);
   }
 
   function updateToggleUi() {
-    var btn = document.getElementById(UI_ROOT_ATTR + '-toggle');
+    var btn = document.getElementById(TOGGLE_ID);
     if (!btn) return;
     var locked = readIsLocked();
     btn.textContent = locked ? '🔒 Tab locked' : '🔓 Lock this tab';
     btn.setAttribute('aria-pressed', locked ? 'true' : 'false');
     btn.title = locked
-      ? 'Unlock this tab (Ctrl/Cmd+Shift+L)'
-      : 'Lock this tab as a Notion launcher (Ctrl/Cmd+Shift+L)';
-    if (locked) btn.classList.add('nll-locked');
-    else btn.classList.remove('nll-locked');
+      ? 'Unlock this tab (Cmd+Shift+L)'
+      : 'Lock this tab as a Notion launcher (Cmd+Shift+L)';
+    applyToggleInlineStyles(btn, locked);
   }
 
   function mountToggle() {
@@ -306,16 +329,23 @@
     if (!doc.documentElement) return;
     ensureToggleStyles(doc);
 
-    var existing = doc.getElementById(UI_ROOT_ATTR + '-toggle');
+    var existing = doc.getElementById(TOGGLE_ID);
     if (existing) {
+      // Notion sometimes moves nodes; keep ours on documentElement.
+      if (existing.parentNode !== doc.documentElement &&
+          existing.parentNode !== doc.body) {
+        (doc.documentElement || doc.body).appendChild(existing);
+      }
       updateToggleUi();
       return;
     }
 
-    var parent = doc.body || doc.documentElement;
+    var parent = doc.documentElement || doc.body;
+    if (!parent) return;
+
     var btn = doc.createElement('button');
     btn.type = 'button';
-    btn.id = UI_ROOT_ATTR + '-toggle';
+    btn.id = TOGGLE_ID;
     btn.setAttribute(UI_ROOT_ATTR, 'toggle');
     btn.setAttribute('aria-label', 'Toggle Notion locked launcher for this tab');
 
@@ -343,38 +373,50 @@
    * disappears, without depending on Notion-specific sidebar selectors.
    */
   function watchToggleSurvival() {
+    var started = false;
     var obs = new MutationObserver(function () {
-      if (!document.getElementById(UI_ROOT_ATTR + '-toggle')) {
+      if (!document.getElementById(TOGGLE_ID)) {
         mountToggle();
       }
     });
 
     function start() {
-      var root = document.body || document.documentElement;
+      if (started) {
+        mountToggle();
+        return;
+      }
+      var root = document.documentElement || document.body;
       if (!root) return;
+      started = true;
       mountToggle();
       try {
         obs.observe(root, { childList: true, subtree: true });
       } catch (e) { /* ignore */ }
+      // Belt-and-suspenders for aggressive SPA remounts (Zen/Firefox + Notion).
+      try {
+        setInterval(function () {
+          if (!document.getElementById(TOGGLE_ID)) mountToggle();
+        }, 1500);
+      } catch (e2) { /* ignore */ }
     }
 
-    if (document.body) start();
-    else {
-      document.addEventListener('DOMContentLoaded', start, { once: true });
-      // document-start: body may appear before DOMContentLoaded.
+    if (document.documentElement || document.body) start();
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+    try {
       var boot = new MutationObserver(function () {
-        if (document.body) {
+        if (document.documentElement || document.body) {
           boot.disconnect();
           start();
         }
       });
-      try {
-        boot.observe(document.documentElement || document, {
-          childList: true,
-          subtree: true
-        });
-      } catch (e) { /* ignore */ }
-    }
+      boot.observe(document, { childList: true, subtree: true });
+    } catch (e) { /* ignore */ }
+    // Late safety net if document-start observers miss the first paint.
+    try {
+      setTimeout(start, 0);
+      setTimeout(start, 500);
+      setTimeout(start, 2000);
+    } catch (e3) { /* ignore */ }
   }
 
   // ---------------------------------------------------------------------------
