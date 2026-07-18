@@ -59,7 +59,7 @@ notion.so,www.notion.so,notion.com,www.notion.com#%#!function(){if(window.__qlFa
 ### Requirements
 
 - AdGuard protection enabled for the browser you use (including **Firefox**)
-- **HTTPS filtering** enabled for sites the script targets (e.g. `notion.so`)
+- **HTTPS filtering** enabled for sites the script targets (e.g. `notion.com`)
 
 ### Updating a script
 
