@@ -22,13 +22,24 @@ Alternatively, if AdGuard offers an open/import from file option, choose the `.u
 
 ### Requirements
 
-- AdGuard protection enabled for the browser you use
+- AdGuard protection enabled for the browser you use (including **Firefox**)
 - **HTTPS filtering** enabled for sites the script targets (e.g. `notion.so`)
 - Leave the script’s `@match` patterns as-is unless you know you need to change them
 
 ### Updating a script
 
 Edit the existing userscript in AdGuard and replace its contents with the latest version from this folder, or remove it and re-add from the file.
+
+### Firefox troubleshooting (Notion favicon lock)
+
+Firefox caches tab icons aggressively. After installing or updating the script:
+
+1. Confirm AdGuard → **Extensions** shows the script **enabled**, version **1.1.0+**
+2. Confirm Firefox is listed as a filtered app in AdGuard, with HTTPS filtering on
+3. Fully **close all Notion tabs**, then open a fresh Notion tab (a reload alone may keep the old cached emoji icon)
+4. If the emoji still sticks, clear that site’s favicon by closing the tab and revisiting, or clear browsing history for `notion.so` / `notion.com` and reopen
+
+You can verify the script is winning in DevTools → Inspector: `<head>` should contain a single `<link rel="icon" data-quiet-layer-favicon="1" …>` pointing at `https://www.notion.so/images/favicon.ico?quiet-layer=1`.
 
 ## Writing new scripts
 
