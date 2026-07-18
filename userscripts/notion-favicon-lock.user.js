@@ -1,451 +1,226 @@
 // ==UserScript==
 // @name         Notion Favicon Lock
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.1.0
-// @description  Keep the Notion browser-tab favicon locked to the default Notion logo (blocks page emoji/icon swaps). Hardened for Firefox + AdGuard.
+// @version      1.2.0
+// @description  Keep the Notion browser-tab favicon locked to the default Notion logo (blocks page emoji/icon swaps).
 // @author       Quiet Layer
 // @match        https://www.notion.so/*
 // @match        https://notion.so/*
+// @match        https://*.notion.so/*
 // @match        https://www.notion.com/*
 // @match        https://notion.com/*
+// @match        https://*.notion.com/*
 // @run-at       document-start
 // @grant        none
-// @grant        window.onurlchange
 // ==/UserScript==
 
 /*
  * Runs inside AdGuard for Mac's built-in userscript manager (not a browser extension).
- * May need updating if Notion changes how it injects or updates favicon <link> elements.
+ * May need updating if Notion changes how it sets favicons.
  *
- * Firefox note: the tab icon is cached aggressively. This script force-replaces icon
- * <link> nodes (remove + insert) rather than only mutating href, and also patches
- * DOM APIs in the page context so Notion cannot quietly swap the icon back.
+ * Firefox: mutate the EXISTING <link rel=icon> href in place. Do not remove/recreate
+ * the node — Firefox tracks the original link and often ignores newly inserted ones.
+ * Prefer applying a data: URI (same mechanism Notion uses for emoji icons) so the
+ * tab icon actually refreshes.
  */
 
 (function () {
   'use strict';
 
-  // Fixed Notion logo — change this constant if you prefer a different favicon URL.
+  // Official Notion favicon (kept for reference / easy swap).
   var FIXED_FAVICON_URL = 'https://www.notion.so/images/favicon.ico';
 
-  // Marker so we can recognize our own <link> and avoid fighting ourselves.
-  var MARKER_ATTR = 'data-quiet-layer-favicon';
+  // What we write into link.href. SVG data URI mirrors how Notion sets emoji
+  // favicons, which Firefox reliably paints; plain https:// swaps often stick.
+  // Change this to FIXED_FAVICON_URL if you prefer the network .ico instead.
+  var FIXED_FAVICON_HREF =
+    'data:image/svg+xml,' +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+        '<rect width="100" height="100" rx="18" fill="#000"/>' +
+        '<path fill="#fff" d="M28 22h14l20 36V22h12v56H60L40 42v36H28V22z"/>' +
+      '</svg>'
+    );
 
-  // How often to re-assert (Firefox sometimes ignores a single DOM write).
-  var POLL_MS = 400;
+  if (window.__quietLayerFaviconLock) return;
+  window.__quietLayerFaviconLock = true;
+
+  var applying = false;
+
+  function isIconLink(node) {
+    if (!node || node.nodeType !== 1 || node.tagName !== 'LINK') return false;
+    var rel = (node.getAttribute('rel') || '').toLowerCase();
+    return rel.indexOf('icon') !== -1 &&
+      rel.indexOf('apple-touch-icon') === -1 &&
+      rel.indexOf('mask-icon') === -1;
+  }
+
+  function hrefLooksFixed(href) {
+    if (!href) return false;
+    if (href === FIXED_FAVICON_HREF) return true;
+    if (href === FIXED_FAVICON_URL) return true;
+    // Absolute form of the official URL
+    try {
+      if (href.indexOf('/images/favicon.ico') !== -1) return true;
+    } catch (e) { /* ignore */ }
+    return false;
+  }
 
   /**
-   * Core lock logic. Designed to run in the *page* JS world so prototype patches
-   * affect Notion's own scripts (AdGuard may otherwise sandbox the userscript).
+   * Firefox-friendly apply: keep the first icon <link> node, only change href.
+   * Create one only if none exists yet.
    */
-  function installLock(FIXED_FAVICON_URL, MARKER_ATTR, POLL_MS) {
-    if (window.__quietLayerFaviconLockInstalled) return;
-    window.__quietLayerFaviconLockInstalled = true;
-
-    var applying = false;
-    var debounceTimer = null;
-    var DEBOUNCE_MS = 20;
-
-    function isIconRel(rel) {
-      if (!rel) return false;
-      rel = String(rel).toLowerCase();
-      // Match icon / shortcut icon / icon shortcut, but not apple-touch-icon etc.
-      // unless Notion uses them as the tab favicon (it usually uses rel=icon).
-      if (rel.indexOf('icon') === -1) return false;
-      if (rel.indexOf('apple-touch-icon') !== -1) return false;
-      if (rel.indexOf('mask-icon') !== -1) return false;
-      return true;
-    }
-
-    function isIconLink(node) {
-      try {
-        return !!(node && node.nodeType === 1 && node.tagName === 'LINK' && isIconRel(node.getAttribute('rel')));
-      } catch (e) {
-        return false;
-      }
-    }
-
-    function isOurs(link) {
-      try {
-        return !!(link && link.getAttribute && link.getAttribute(MARKER_ATTR) === '1');
-      } catch (e) {
-        return false;
-      }
-    }
-
-    function hrefIsFixed(link) {
-      try {
-        var href = link.getAttribute('href') || '';
-        // Allow optional cache-bust query we may append.
-        return href === FIXED_FAVICON_URL || href.indexOf(FIXED_FAVICON_URL + '?') === 0;
-      } catch (e) {
-        return false;
-      }
-    }
-
-    function needsFix() {
-      try {
-        var head = document.head || document.getElementsByTagName('head')[0];
-        if (!head) return true;
-
-        var links = head.querySelectorAll('link[rel]');
-        var ours = 0;
-        for (var i = 0; i < links.length; i++) {
-          var link = links[i];
-          if (!isIconLink(link)) continue;
-          if (isOurs(link) && hrefIsFixed(link)) {
-            ours++;
-          } else {
-            return true; // foreign or wrong icon present
-          }
-        }
-        return ours !== 1;
-      } catch (e) {
-        return true;
-      }
-    }
-
-    /**
-     * Firefox often ignores in-place href changes on existing <link rel=icon>.
-     * Always remove foreign icons and (re)insert a fresh canonical <link>.
-     */
-    function applyFixedFavicon(forceRecreate) {
-      if (applying) return;
-      try {
-        var head = document.head || document.getElementsByTagName('head')[0];
-        if (!head) return;
-
-        if (!forceRecreate && !needsFix()) return;
-
-        applying = true;
-
-        var links = head.querySelectorAll('link[rel]');
-        var existingOurs = null;
-
-        for (var i = 0; i < links.length; i++) {
-          var link = links[i];
-          if (!isIconLink(link)) continue;
-
-          if (!forceRecreate && !existingOurs && isOurs(link) && hrefIsFixed(link)) {
-            existingOurs = link;
-            continue;
-          }
-
-          try {
-            if (link.parentNode) link.parentNode.removeChild(link);
-          } catch (e) { /* ignore */ }
-        }
-
-        if (existingOurs) {
-          // Keep a single healthy marker link.
-          try {
-            if (existingOurs.getAttribute('rel') !== 'icon') {
-              existingOurs.setAttribute('rel', 'icon');
-            }
-            if (!hrefIsFixed(existingOurs)) {
-              existingOurs.setAttribute('href', FIXED_FAVICON_URL);
-            }
-            existingOurs.setAttribute(MARKER_ATTR, '1');
-          } catch (e) { /* ignore */ }
-        } else {
-          var el = document.createElement('link');
-          el.setAttribute('rel', 'icon');
-          el.setAttribute('type', 'image/x-icon');
-          el.setAttribute(MARKER_ATTR, '1');
-          // Stable cache-bust helps Firefox pick our icon over a prior emoji data: URI
-          // that may already be stored against this tab/history entry.
-          el.setAttribute('href', FIXED_FAVICON_URL + '?quiet-layer=1');
-          head.appendChild(el);
-        }
-      } catch (e) {
-        // Fail silently — never break Notion.
-      } finally {
-        applying = false;
-      }
-    }
-
-    function scheduleApply(forceRecreate) {
-      if (applying) return;
-      if (debounceTimer !== null) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function () {
-        debounceTimer = null;
-        applyFixedFavicon(!!forceRecreate);
-      }, DEBOUNCE_MS);
-    }
-
-    // --- Patch DOM write paths Notion uses (page context) ---
-    function patchSetAttribute() {
-      try {
-        var proto = Element.prototype;
-        var original = proto.setAttribute;
-        if (!original || original.__quietLayerFaviconPatched) return;
-
-        function patchedSetAttribute(name, value) {
-          if (this && this.tagName === 'LINK') {
-            var attr = String(name).toLowerCase();
-            if (attr === 'href' && isIconLink(this) && !isOurs(this)) {
-              // Redirect Notion's emoji/custom icon write to our logo.
-              return original.call(this, name, FIXED_FAVICON_URL + '?quiet-layer=1');
-            }
-            if (attr === 'rel' && isIconRel(value) && !isOurs(this)) {
-              var result = original.call(this, name, value);
-              try {
-                original.call(this, 'href', FIXED_FAVICON_URL + '?quiet-layer=1');
-                original.call(this, MARKER_ATTR, '1');
-              } catch (e) { /* ignore */ }
-              scheduleApply(true);
-              return result;
-            }
-          }
-          return original.apply(this, arguments);
-        }
-
-        patchedSetAttribute.__quietLayerFaviconPatched = true;
-        proto.setAttribute = patchedSetAttribute;
-      } catch (e) { /* ignore */ }
-    }
-
-    function patchHrefProperty() {
-      try {
-        var desc = Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href');
-        if (!desc || !desc.set || desc.set.__quietLayerFaviconPatched) return;
-
-        var originalSet = desc.set;
-        var originalGet = desc.get;
-
-        function patchedSet(value) {
-          try {
-            if (isIconLink(this) && !isOurs(this)) {
-              value = FIXED_FAVICON_URL + '?quiet-layer=1';
-              try {
-                this.setAttribute(MARKER_ATTR, '1');
-              } catch (e) { /* ignore */ }
-            }
-          } catch (e) { /* ignore */ }
-          return originalSet.call(this, value);
-        }
-
-        patchedSet.__quietLayerFaviconPatched = true;
-        Object.defineProperty(HTMLLinkElement.prototype, 'href', {
-          configurable: true,
-          enumerable: desc.enumerable,
-          get: originalGet,
-          set: patchedSet
-        });
-      } catch (e) { /* ignore */ }
-    }
-
-    function patchNodeInsertion(methodName) {
-      try {
-        var proto = Node.prototype;
-        var original = proto[methodName];
-        if (!original || original.__quietLayerFaviconPatched) return;
-
-        function patched() {
-          var node = arguments[0];
-          var result = original.apply(this, arguments);
-          try {
-            if (isIconLink(node) && !isOurs(node)) {
-              scheduleApply(true);
-            } else if (node && node.querySelectorAll) {
-              var nested = node.querySelectorAll('link[rel]');
-              for (var i = 0; i < nested.length; i++) {
-                if (isIconLink(nested[i]) && !isOurs(nested[i])) {
-                  scheduleApply(true);
-                  break;
-                }
-              }
-            }
-          } catch (e) { /* ignore */ }
-          return result;
-        }
-
-        patched.__quietLayerFaviconPatched = true;
-        proto[methodName] = patched;
-      } catch (e) { /* ignore */ }
-    }
-
-    function startObserver() {
-      try {
-        if (typeof MutationObserver === 'undefined') return;
-
-        var observer = new MutationObserver(function (mutations) {
-          if (applying) return;
-          for (var i = 0; i < mutations.length; i++) {
-            var m = mutations[i];
-
-            if (m.type === 'attributes' && isIconLink(m.target)) {
-              if (!isOurs(m.target) || !hrefIsFixed(m.target)) {
-                scheduleApply(true);
-                return;
-              }
-            }
-
-            if (m.addedNodes && m.addedNodes.length) {
-              for (var a = 0; a < m.addedNodes.length; a++) {
-                var added = m.addedNodes[a];
-                if (isIconLink(added) && !isOurs(added)) {
-                  scheduleApply(true);
-                  return;
-                }
-                if (added && added.querySelectorAll) {
-                  var nested = added.querySelectorAll('link[rel]');
-                  for (var n = 0; n < nested.length; n++) {
-                    if (isIconLink(nested[n]) && !isOurs(nested[n])) {
-                      scheduleApply(true);
-                      return;
-                    }
-                  }
-                }
-              }
-            }
-
-            if (m.removedNodes && m.removedNodes.length) {
-              for (var r = 0; r < m.removedNodes.length; r++) {
-                if (isIconLink(m.removedNodes[r])) {
-                  scheduleApply(true);
-                  return;
-                }
-              }
-            }
-          }
-        });
-
-        function observe(target) {
-          if (!target) return;
-          observer.observe(target, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['href', 'rel', MARKER_ATTR]
-          });
-        }
-
-        observe(document.head || document.documentElement || document);
-
-        if (!document.head) {
-          var headWait = new MutationObserver(function () {
-            if (document.head) {
-              try { headWait.disconnect(); } catch (e) { /* ignore */ }
-              observe(document.head);
-              applyFixedFavicon(true);
-            }
-          });
-          try {
-            headWait.observe(document.documentElement || document, {
-              childList: true,
-              subtree: true
-            });
-          } catch (e) { /* ignore */ }
-        }
-      } catch (e) { /* ignore */ }
-    }
-
-    function hookHistory() {
-      try {
-        function wrap(type) {
-          var original = history[type];
-          if (typeof original !== 'function' || original.__quietLayerFaviconPatched) return;
-          function patched() {
-            var result = original.apply(this, arguments);
-            scheduleApply(true);
-            return result;
-          }
-          patched.__quietLayerFaviconPatched = true;
-          history[type] = patched;
-        }
-        wrap('pushState');
-        wrap('replaceState');
-        window.addEventListener('popstate', function () {
-          scheduleApply(true);
-        }, true);
-      } catch (e) { /* ignore */ }
-    }
-
-    function hookUrlChange() {
-      // AdGuard SPA helper when @grant window.onurlchange is present.
-      try {
-        window.addEventListener('urlchange', function () {
-          scheduleApply(true);
-        });
-      } catch (e) { /* ignore */ }
-      try {
-        if (typeof window.onurlchange !== 'undefined') {
-          var prev = window.onurlchange;
-          window.onurlchange = function (event) {
-            try {
-              if (typeof prev === 'function') prev.call(this, event);
-            } catch (e) { /* ignore */ }
-            scheduleApply(true);
-          };
-        }
-      } catch (e) { /* ignore */ }
-    }
-
-    function startPolling() {
-      try {
-        setInterval(function () {
-          if (needsFix()) applyFixedFavicon(true);
-        }, POLL_MS);
-      } catch (e) { /* ignore */ }
-    }
-
-    // Install hooks first, then assert favicon.
-    patchSetAttribute();
-    patchHrefProperty();
-    patchNodeInsertion('appendChild');
-    patchNodeInsertion('insertBefore');
-    patchNodeInsertion('replaceChild');
-    startObserver();
-    hookHistory();
-    hookUrlChange();
-    startPolling();
-
-    applyFixedFavicon(true);
-
+  function applyFixedFavicon() {
+    if (applying) return;
+    applying = true;
     try {
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
-          applyFixedFavicon(true);
-        }, { once: true });
+      var head = document.head || document.getElementsByTagName('head')[0];
+      if (!head) return;
+
+      var links = head.querySelectorAll('link[rel]');
+      var primary = null;
+
+      for (var i = 0; i < links.length; i++) {
+        if (!isIconLink(links[i])) continue;
+        if (!primary) {
+          primary = links[i];
+        } else {
+          // Extra icon links confuse some browsers; drop the extras only.
+          try {
+            if (links[i].parentNode) links[i].parentNode.removeChild(links[i]);
+          } catch (e) { /* ignore */ }
+        }
       }
-      window.addEventListener('load', function () {
-        applyFixedFavicon(true);
-      }, { once: true });
+
+      if (!primary) {
+        primary = document.createElement('link');
+        primary.setAttribute('rel', 'icon');
+        head.appendChild(primary);
+      }
+
+      // Prefer property write (fires the same path Notion uses).
+      if (!hrefLooksFixed(primary.href) || primary.getAttribute('href') !== FIXED_FAVICON_HREF) {
+        primary.rel = 'icon';
+        primary.type = 'image/svg+xml';
+        primary.href = FIXED_FAVICON_HREF;
+      }
+    } catch (e) {
+      // Fail silently — never break Notion.
+    } finally {
+      applying = false;
+    }
+  }
+
+  function scheduleApply() {
+    if (applying) return;
+    try {
+      applyFixedFavicon();
     } catch (e) { /* ignore */ }
   }
 
-  /**
-   * Also try to install in the page JS world via a temporary <script>.
-   * AdGuard may sandbox the userscript; page-world patches stop Notion's own
-   * writes. Notion's CSP may block this — that is fine; we always install
-   * directly below as well (observer/poll still fix the DOM).
-   */
-  function tryInstallInPageContext(fn, a, b, c) {
-    try {
-      var parent = document.documentElement || document.head || document;
-      if (!parent) return;
-
-      var script = document.createElement('script');
-      script.setAttribute('data-quiet-layer', 'favicon-lock');
-      script.textContent =
-        '(' + fn.toString() + ')(' +
-        JSON.stringify(a) + ',' +
-        JSON.stringify(b) + ',' +
-        JSON.stringify(c) +
-        ');';
-
-      parent.appendChild(script);
-      if (script.parentNode) script.parentNode.removeChild(script);
-    } catch (e) { /* ignore — CSP or missing root */ }
-  }
-
+  // Intercept createElement('link') so Notion's new icon nodes get our href.
   try {
-    // Always install in the userscript realm (DOM observer + poll).
-    installLock(FIXED_FAVICON_URL, MARKER_ATTR, POLL_MS);
-    // Best-effort page-realm install for prototype patches.
-    tryInstallInPageContext(installLock, FIXED_FAVICON_URL, MARKER_ATTR, POLL_MS);
-  } catch (e) {
-    // Fail silently — never break Notion.
-  }
+    var originalCreateElement = Document.prototype.createElement;
+    Document.prototype.createElement = function (tagName, options) {
+      var el = originalCreateElement.call(this, tagName, options);
+      try {
+        if (typeof tagName === 'string' && tagName.toLowerCase() === 'link') {
+          var hrefDesc = Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href');
+          if (hrefDesc && hrefDesc.set) {
+            Object.defineProperty(el, 'href', {
+              configurable: true,
+              enumerable: hrefDesc.enumerable,
+              get: function () { return hrefDesc.get.call(this); },
+              set: function (value) {
+                if (isIconLink(this) || (this.rel && String(this.rel).toLowerCase().indexOf('icon') !== -1)) {
+                  return hrefDesc.set.call(this, FIXED_FAVICON_HREF);
+                }
+                return hrefDesc.set.call(this, value);
+              }
+            });
+          }
+
+          var originalSetAttribute = el.setAttribute;
+          el.setAttribute = function (name, value) {
+            var result = originalSetAttribute.call(this, name, value);
+            try {
+              var n = String(name).toLowerCase();
+              if (n === 'href' && isIconLink(this)) {
+                originalSetAttribute.call(this, 'href', FIXED_FAVICON_HREF);
+              } else if (n === 'rel' && value && String(value).toLowerCase().indexOf('icon') !== -1) {
+                originalSetAttribute.call(this, 'href', FIXED_FAVICON_HREF);
+              }
+            } catch (e) { /* ignore */ }
+            return result;
+          };
+        }
+      } catch (e) { /* ignore */ }
+      return el;
+    };
+  } catch (e) { /* ignore */ }
+
+  // Patch prototype href setter as a belt-and-suspenders guard.
+  try {
+    var desc = Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href');
+    if (desc && desc.set && !desc.set.__quietLayerFavicon) {
+      var originalSet = desc.set;
+      var originalGet = desc.get;
+      function patchedSet(value) {
+        try {
+          if (isIconLink(this)) value = FIXED_FAVICON_HREF;
+        } catch (e) { /* ignore */ }
+        return originalSet.call(this, value);
+      }
+      patchedSet.__quietLayerFavicon = true;
+      Object.defineProperty(HTMLLinkElement.prototype, 'href', {
+        configurable: true,
+        enumerable: desc.enumerable,
+        get: originalGet,
+        set: patchedSet
+      });
+    }
+  } catch (e) { /* ignore */ }
+
+  // MutationObserver — same strategy as the working Firefox "Static Notion Favicon" addon.
+  try {
+    var observer = new MutationObserver(function () {
+      scheduleApply();
+    });
+    var root = document.documentElement || document;
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href', 'rel']
+    });
+  } catch (e) { /* ignore */ }
+
+  // History / SPA navigations
+  try {
+    var wrap = function (type) {
+      var original = history[type];
+      if (typeof original !== 'function') return;
+      history[type] = function () {
+        var ret = original.apply(this, arguments);
+        scheduleApply();
+        return ret;
+      };
+    };
+    wrap('pushState');
+    wrap('replaceState');
+    window.addEventListener('popstate', scheduleApply, true);
+  } catch (e) { /* ignore */ }
+
+  // Poll — Notion sometimes writes favicons without a mutation we catch.
+  try {
+    setInterval(scheduleApply, 500);
+  } catch (e) { /* ignore */ }
+
+  scheduleApply();
+  try {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', scheduleApply, { once: true });
+    }
+    window.addEventListener('load', scheduleApply, { once: true });
+  } catch (e) { /* ignore */ }
 })();

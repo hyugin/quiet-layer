@@ -3,9 +3,17 @@
 ! Description: Personal ABP-syntax ruleset (AdGuard, uBO-compatible lists, etc.)—cosmetics, hand-picked network blocks, and redirect cuts.
 ! Homepage: https://github.com/hyugin/quiet-layer
 ! RAW: https://raw.githubusercontent.com/hyugin/quiet-layer/main/quiet-layer.txt
-! Version: 1.34
-! Last modified: 2026-04-18
+! Version: 1.35
+! Last modified: 2026-07-18
 ! Expires: 1 day
+
+! ========================================
+! NOTION - LOCK DEFAULT FAVICON
+! ========================================
+! Injected via AdGuard JS rules (more reliable than userscripts on Mac/Firefox).
+! Requires this filter to be trusted / "Allow script and CSS" enabled in AdGuard.
+! Mutates the existing <link rel=icon> href in place (Firefox ignores recreate).
+notion.so,www.notion.so,notion.com,www.notion.com#%#!function(){if(window.__qlFavLock)return;window.__qlFavLock=1;var H="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="18" fill="#000"/><path fill="#fff" d="M28 22h14l20 36V22h12v56H60L40 42v36H28V22z"/></svg>');function ok(h){return!!h&&(h===H||h.indexOf("favicon.ico")!==-1)}function icon(n){if(!n||n.tagName!=="LINK")return!1;var r=(n.getAttribute("rel")||"").toLowerCase();return r.indexOf("icon")!==-1&&r.indexOf("apple-touch-icon")===-1}function fix(){try{var head=document.head;if(!head)return;var links=head.querySelectorAll("link[rel]"),p=null;for(var i=0;i<links.length;i++){if(!icon(links[i]))continue;if(!p)p=links[i];else try{links[i].parentNode&&links[i].parentNode.removeChild(links[i])}catch(e){}}if(!p){p=document.createElement("link");p.rel="icon";head.appendChild(p)}if(!ok(p.href)||p.getAttribute("href")!==H){p.rel="icon";p.type="image/svg+xml";p.href=H}}catch(e){}}fix();try{new MutationObserver(fix).observe(document.documentElement,{childList:!0,subtree:!0,attributes:!0,attributeFilter:["href","rel"]})}catch(e){}try{setInterval(fix,500)}catch(e){}}();
 
 ! ========================================
 ! REDDIT - ADS & ANNOYANCES
