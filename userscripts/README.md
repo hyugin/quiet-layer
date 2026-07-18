@@ -41,20 +41,26 @@ notion.so,www.notion.so,notion.com,www.notion.com#%#!function(){if(window.__qlFa
 
 Edit the existing userscript in AdGuard and replace its contents with the latest version from this folder, or remove it and re-add from the file.
 
-## Firefox troubleshooting
+## Firefox / Zen troubleshooting
 
 Firefox caches tab icons aggressively and often **ignores newly inserted** `<link rel=icon>` nodes — it tracks the original link and only reliably updates when that node’s `href` changes (ideally to a `data:` URI, which is what Notion uses for emoji icons).
 
 After installing/updating:
 
 1. Prefer the **Quiet Layer `#%#` rule** (or User rules paste) over the userscript
-2. Confirm HTTPS filtering is on for Firefox
+2. Confirm HTTPS filtering is on for Firefox / Zen
 3. Fully **close all Notion tabs**, then open a fresh one
 4. In DevTools → Inspector, the primary `link[rel=icon]` `href` should start with `data:image/svg+xml`
 
-### Guaranteed Firefox fallback
+### Zen Browser: use “Set icon” on the tab (best option)
 
-If AdGuard injection still doesn’t stick, use the dedicated extension: [Static Notion Favicon](https://addons.mozilla.org/en-US/firefox/addon/static-notion-favicon/) (WebExtension APIs are more reliable for tab icons than page JS alone).
+In [Zen Browser](https://zen-browser.app/), right‑click the Notion tab → **Set icon** / **Edit tab icon** and pick the Notion logo (or any emoji).
+
+This sets Zen’s `zenStaticIcon` and calls `gBrowser.setIcon` at the **browser UI** layer. Notion’s page JS can keep swapping `<link rel=icon>`, but the tab chrome keeps your chosen icon. That is more reliable here than any userscript or AdGuard `#%#` rule.
+
+### Other Firefox fallback
+
+If you’re on stock Firefox (not Zen) and AdGuard injection still doesn’t stick: [Static Notion Favicon](https://addons.mozilla.org/en-US/firefox/addon/static-notion-favicon/) (WebExtension APIs are more reliable for tab icons than page JS alone).
 
 ## Writing new scripts
 
