@@ -1,0 +1,19 @@
+/* Visual lock indicator — chrome tab UI only (no on-page widgets). */
+
+.tabbrowser-tab[notion-locked-launcher="true"] .tab-background {
+  outline: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  outline-offset: -2px;
+}
+
+.tabbrowser-tab[notion-locked-launcher="true"] .tab-label::before {
+  content: "🔒 ";
+  font-size: 0.85em;
+}
+
+/* Essentials / compact icon-only tabs: tint the icon container instead. */
+.tabbrowser-tab[notion-locked-launcher="true"][zen-essential] .tab-icon-stack,
+.tabbrowser-tab[notion-locked-launcher="true"]:not([label]) .tab-icon-stack {
+  outline: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}

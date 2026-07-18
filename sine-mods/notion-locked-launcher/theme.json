@@ -1,0 +1,22 @@
+{
+  "id": "08e293fd-172a-46c0-b032-21fcd833670f",
+  "name": "Notion Locked Launcher",
+  "description": "Lock a Notion tab as a launcher: nav links open in new tabs; the locked tab stays put.",
+  "homepage": "https://github.com/hyugin/quiet-layer/tree/main/sine-mods/notion-locked-launcher",
+  "author": "Quiet Layer",
+  "version": "1.0.0",
+  "createdAt": "2026-07-18",
+  "updatedAt": "2026-07-18",
+  "tags": ["notion", "tabs", "launcher", "productivity", "zen browser"],
+  "fork": ["zen"],
+  "chromeManifest": "chrome.manifest",
+  "scripts": {
+    "notion-locked-launcher.uc.js": {
+      "include": ["chrome://browser/content/browser.xhtml"]
+    }
+  },
+  "style": {
+    "chrome": "style.css"
+  },
+  "readme": "README.md"
+}
