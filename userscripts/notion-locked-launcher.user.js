@@ -1,14 +1,20 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.0.2
+// @version      1.0.3
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
+// @match        https://www.notion.com/*
+// @match        https://notion.com/*
+// @match        https://*.notion.com/*
 // @match        https://www.notion.so/*
 // @match        https://notion.so/*
 // @match        https://*.notion.so/*
 // @match        https://*.notion.site/*
 // @match        https://notion.site/*
+// @include      *://www.notion.com/*
+// @include      *://notion.com/*
+// @include      *://*.notion.com/*
 // @include      *://www.notion.so/*
 // @include      *://notion.so/*
 // @include      *://*.notion.so/*
@@ -21,7 +27,7 @@
 /*
  * Runs inside AdGuard for Mac's built-in userscript manager (not a browser
  * extension). Paste into AdGuard → Extensions → +. Requires AdGuard protection
- * and HTTPS filtering for notion.so / notion.site.
+ * and HTTPS filtering for notion.com (primary), plus notion.so / notion.site.
  *
  * Zen Browser: AdGuard does not always filter Zen by default. Add Zen in
  * AdGuard → Settings → Network → filtered applications (+ → Zen.app), then
@@ -110,7 +116,11 @@
   function isNotionHost(hostname) {
     if (!hostname) return false;
     var h = String(hostname).toLowerCase();
+    // notion.com is the current app host; .so / .site still appear for
+    // redirects, public pages, and older workspace URLs.
     return (
+      h === 'notion.com' ||
+      h.endsWith('.notion.com') ||
       h === 'notion.so' ||
       h.endsWith('.notion.so') ||
       h === 'notion.site' ||
