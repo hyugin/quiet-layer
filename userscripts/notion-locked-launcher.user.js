@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.0.0
+// @version      1.0.1
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.so/*
@@ -14,19 +14,18 @@
 // ==/UserScript==
 
 /*
- * Installation (Tampermonkey / Violentmonkey)
- * -------------------------------------------
- * 1. Install Tampermonkey or Violentmonkey in Firefox / Zen (or Chromium).
- * 2. Create a new script → paste this entire file → save / enable.
- * 3. Open Notion (notion.so) in a tab, navigate to your launcher page
- *    (e.g. Tasks database), then click “🔓 Lock this tab” or press
- *    Cmd+Shift+L (macOS) / Ctrl+Shift+L (elsewhere).
- * 4. Clicking Notion nav links (sidebar, pages, relations, etc.) now opens
- *    destinations in a NEW tab; this tab stays on the locked URL.
+ * Runs inside AdGuard for Mac's built-in userscript manager (not a browser
+ * extension). Paste into AdGuard → Extensions → +. Requires AdGuard protection
+ * and HTTPS filtering for notion.so / notion.site in the browser you use
+ * (including Firefox / Zen).
  *
  * Usage
  * -----
- * - Lock / unlock: floating control (bottom-right) or Cmd/Ctrl+Shift+L.
+ * 1. Open Notion → go to your launcher page (e.g. Tasks database).
+ * 2. Click “🔓 Lock this tab” (bottom-right) or press Cmd+Shift+L.
+ * 3. Sidebar / page / relation links open in a NEW tab; this tab stays put.
+ * 4. Unlock with the same control or shortcut.
+ *
  * - State is per-tab via sessionStorage (not shared across tabs).
  * - Unlock clears saved state for this tab.
  *
