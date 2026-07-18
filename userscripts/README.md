@@ -9,6 +9,19 @@ AdGuard for Mac is **not** a browser extension; scripts may need updates if a si
 | Script | Purpose |
 | --- | --- |
 | [`notion-favicon-lock.user.js`](./notion-favicon-lock.user.js) | Keep the Notion tab favicon locked to the default Notion logo |
+| [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) | Lock a Notion tab as a launcher: nav links open in new tabs; the locked tab stays put |
+
+### Notion Locked Launcher (Tampermonkey / Violentmonkey)
+
+Recommended in **Firefox / Zen** via Tampermonkey or Violentmonkey (also works in Chromium managers).
+
+1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/)
+2. Create a new script → paste the full contents of [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) → save / enable
+3. Open Notion → go to your launcher page (e.g. Tasks database) → click **🔓 Lock this tab** (or **Cmd+Shift+L** on macOS / **Ctrl+Shift+L** elsewhere)
+4. Sidebar / page / relation links open in a **new** tab; the locked tab stays on the exact saved URL
+5. Unlock with the same control or shortcut (state is per-tab via `sessionStorage`)
+
+Optional config near the top of the script: `INTERCEPT_EXTERNAL_LINKS` (default `false`), `DEBUG` (default `false`).
 
 ## Preferred: Quiet Layer filter JS rule (AdGuard)
 
