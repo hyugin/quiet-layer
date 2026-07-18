@@ -23,6 +23,10 @@ https://raw.githubusercontent.com/hyugin/quiet-layer/main/quiet-layer.txt
 1. **Safari protection** → **Filters** → **Custom** → **Add a filter**
 2. Paste the subscribe URL above
 
+## Userscripts (AdGuard for Mac)
+
+Optional userscripts for AdGuard for Mac’s built-in userscript manager live in [`userscripts/`](./userscripts/). See [`userscripts/README.md`](./userscripts/README.md) for install steps.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
