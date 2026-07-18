@@ -25,7 +25,7 @@ https://raw.githubusercontent.com/hyugin/quiet-layer/main/quiet-layer.txt
 
 ## Userscripts (AdGuard for Mac)
 
-Optional userscripts for AdGuard for Mac’s built-in userscript manager live in [`userscripts/`](./userscripts/). See [`userscripts/README.md`](./userscripts/README.md) for install steps.
+Optional userscripts live in [`userscripts/`](./userscripts/). The Notion favicon lock is also included as an AdGuard JS rule in `quiet-layer.txt` (enable **Allow scripts and CSS / trusted** on this filter). See [`userscripts/README.md`](./userscripts/README.md).
 
 ## License
 
