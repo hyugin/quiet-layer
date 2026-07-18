@@ -13,14 +13,26 @@ AdGuard for Mac is **not** a browser extension; scripts may need updates if a si
 
 ### Notion Locked Launcher
 
-Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to-install-a-userscript-in-adguard-for-mac) below). Make sure **HTTPS filtering** is on for `notion.so` / `notion.site`.
+Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to-install-a-userscript-in-adguard-for-mac) below). Make sure **HTTPS filtering** is on for `notion.com` (primary), plus `notion.so` / `notion.site` if you still use those hosts.
 
 1. Paste [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) into AdGuard → **Extensions** → **+**
-2. Open Notion → go to your launcher page (e.g. Tasks database) → click **🔓 Lock this tab** (or **Cmd+Shift+L**)
+2. Open Notion → go to your launcher page (e.g. Tasks database) → click **🔓 Lock this tab** (top-right) or press **Cmd+Shift+L**
 3. Sidebar / page / relation links open in a **new** tab; the locked tab stays on the exact saved URL
 4. Unlock with the same control or shortcut (state is per-tab via `sessionStorage`)
 
 Optional config near the top of the script: `INTERCEPT_EXTERNAL_LINKS` (default `false`), `DEBUG` (default `false`).
+
+#### Zen Browser: toggle not showing?
+
+Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inject.
+
+1. AdGuard → **Settings** → **Network** → **filtered applications** (wording varies) → **+** → add **Zen.app** / **Zen Browser.app**
+2. Confirm **HTTPS filtering** is enabled for `notion.com` (and `notion.so` if needed)
+3. In AdGuard → **Extensions**, confirm Notion Locked Launcher is **enabled**
+4. Fully **close all Notion tabs**, open a fresh one
+5. Open DevTools → Console and look for: `[Notion Locked Launcher] active`
+
+If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering). If the line is present but no button, try **Cmd+Shift+L** — lock still works without the button.
 
 ## Preferred: Quiet Layer filter JS rule (AdGuard)
 
@@ -47,7 +59,7 @@ notion.so,www.notion.so,notion.com,www.notion.com#%#!function(){if(window.__qlFa
 ### Requirements
 
 - AdGuard protection enabled for the browser you use (including **Firefox**)
-- **HTTPS filtering** enabled for sites the script targets (e.g. `notion.so`)
+- **HTTPS filtering** enabled for sites the script targets (e.g. `notion.com`)
 
 ### Updating a script
 
