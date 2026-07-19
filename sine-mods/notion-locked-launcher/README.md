@@ -4,7 +4,9 @@ Lock a Notion tab as a permanent launcher: left-clicks on Notion `<a href>` link
 
 Chrome UX only — **no on-page floating button**. Toggle via the tab context menu or **Cmd+Shift+L** (Ctrl+Shift+L on non-macOS).
 
-This is the Zen Browser [Sine](https://github.com/CosmoCreeper/Sine) port of the AdGuard userscript in [`userscripts/notion-locked-launcher.user.js`](../../userscripts/notion-locked-launcher.user.js). Prefer this mod in Zen; keep the userscript for other browsers filtered by AdGuard.
+This is the Zen Browser [Sine](https://github.com/CosmoCreeper/Sine) port of the AdGuard userscript in [`userscripts/notion-locked-launcher.user.js`](../../userscripts/notion-locked-launcher.user.js).
+
+**Prefer the WebExtension** in [`extensions/notion-locked-launcher/`](../../extensions/notion-locked-launcher/) unless you already run Sine and want tab-chrome styling / Zen pinned-URL sync. Keep the userscript for AdGuard-filtered browsers.
 
 ## Architecture
 
@@ -24,9 +26,9 @@ State is **per-tab** (stored on the XUL tab), not global. The content actor re-s
 
 ## Install (local Sine)
 
-Requires [Sine](https://github.com/CosmoCreeper/Sine) in Zen Browser (macOS OK).
+Requires [Sine](https://github.com/CosmoCreeper/Sine) in Zen Browser — **not** Zen’s built-in **Zen Mods** pane. If Settings only shows Zen Mods, install Sine first ([guide](https://github.com/sineorg/docs/blob/main/src/installation.md)).
 
-1. Open **Settings → Sine** (or Cosine).
+1. Open **Settings → Sine** / **Sine Mods** (or **Cosine**), or `about:preferences#sineMods`.
 2. Open the Sine **gear / settings** and enable **“Enable installing JS from unofficial sources”** (unsafe; local/trusted repos only).
 3. Under **“add your own locally from a GitHub repo”**, paste either:
    - `https://github.com/hyugin/quiet-layer/tree/main/sine-mods/notion-locked-launcher`

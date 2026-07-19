@@ -27,9 +27,11 @@ https://raw.githubusercontent.com/hyugin/quiet-layer/main/quiet-layer.txt
 
 Optional userscripts live in [`userscripts/`](./userscripts/). The Notion favicon lock is also included as an AdGuard JS rule in `quiet-layer.txt` (enable **Allow scripts and CSS / trusted** on this filter). See [`userscripts/README.md`](./userscripts/README.md).
 
-## Zen Browser (Sine)
+## Notion Locked Launcher (Zen / Firefox)
 
-[`sine-mods/notion-locked-launcher/`](./sine-mods/notion-locked-launcher/) is a Sine mod that locks a Notion tab as a launcher (tab menu + Cmd+Shift+L). See that folder’s README for local Sine install steps.
+Preferred: the WebExtension in [`extensions/notion-locked-launcher/`](./extensions/notion-locked-launcher/) (tab menu + toolbar badge + Cmd+Shift+L). Load it from `about:debugging` — no Sine, no AdGuard injection.
+
+Alternatives: [AdGuard userscript](./userscripts/notion-locked-launcher.user.js), or the [Sine mod](./sine-mods/notion-locked-launcher/) if you already run Sine.
 
 ## License
 

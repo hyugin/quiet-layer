@@ -13,7 +13,7 @@ AdGuard for Mac is **not** a browser extension; scripts may need updates if a si
 
 ### Notion Locked Launcher
 
-**Zen Browser:** prefer the Sine mod in [`../sine-mods/notion-locked-launcher/`](../sine-mods/notion-locked-launcher/) (tab context menu + Cmd+Shift+L, no on-page button). The AdGuard userscript below remains for other browsers.
+**Zen / Firefox:** prefer the WebExtension in [`../extensions/notion-locked-launcher/`](../extensions/notion-locked-launcher/) (tab context menu + toolbar badge + Cmd+Shift+L, no on-page button, no Sine). The AdGuard userscript below remains when you want AdGuard-managed injection instead.
 
 Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to-install-a-userscript-in-adguard-for-mac) below). Make sure **HTTPS filtering** is on for `notion.com` (primary), plus `notion.so` / `notion.site` if you still use those hosts.
 
