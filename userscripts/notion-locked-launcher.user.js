@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.2.1
+// @version      1.2.2
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -38,8 +38,7 @@
  * -----
  * 1. Open Notion → go to your launcher page (e.g. Tasks database).
  * 2. Lock via the tiny right-edge peek control (hover to expand) or Cmd+Shift+L.
- * 3. While locked, the tab title is prefixed with 🔒 (visible in Zen’s sidebar).
- * 4. Sidebar / page / relation links open in a NEW tab; this tab stays put.
+ * 3. Sidebar / page / relation links open in a NEW tab; this tab stays put.
  *
  * - State is per-tab via sessionStorage (not shared across tabs).
  * - Click capture handles <a href> navigations.
@@ -61,12 +60,6 @@
 
   /** When true, external (non-Notion) links also open in a new tab from a locked launcher. */
   var INTERCEPT_EXTERNAL_LINKS = false;
-
-  /** Prefix the document/tab title while locked (shows in Zen’s tab sidebar). */
-  var SHOW_TITLE_LOCK_INDICATOR = true;
-
-  /** Title prefix used when SHOW_TITLE_LOCK_INDICATOR is on. */
-  var TITLE_LOCK_PREFIX = '🔒 ';
 
   /**
    * Tiny right-edge peek chip. Collapsed to a sliver; hover/focus expands the
@@ -233,9 +226,16 @@
   }
 
   function syncChromeUi() {
-    syncTitleLockIndicator();
     if (SHOW_PEEK_TOGGLE) updatePeekToggle();
     else removePeekToggle();
+  }
+
+  /** One-time cleanup if an older build left a 🔒 title prefix. */
+  function clearLegacyTitleLockPrefix() {
+    try {
+      var t = String(document.title || '');
+      if (t.indexOf('🔒 ') === 0) document.title = t.slice(2);
+    } catch (e) { /* ignore */ }
   }
 
   // ---------------------------------------------------------------------------
@@ -272,67 +272,6 @@
       log('openInNewTab failed', e2);
       return false;
     }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Tab title indicator (visible in Zen sidebar — no on-page chrome)
-  // ---------------------------------------------------------------------------
-
-  var titleSyncing = false;
-
-  function stripTitleLockPrefix(title) {
-    var t = String(title || '');
-    while (t.indexOf(TITLE_LOCK_PREFIX) === 0) {
-      t = t.slice(TITLE_LOCK_PREFIX.length);
-    }
-    return t;
-  }
-
-  function syncTitleLockIndicator() {
-    if (!SHOW_TITLE_LOCK_INDICATOR) return;
-    titleSyncing = true;
-    try {
-      var raw = stripTitleLockPrefix(document.title);
-      var next = readIsLocked() ? TITLE_LOCK_PREFIX + raw : raw;
-      if (document.title !== next) document.title = next;
-    } catch (e) { /* ignore */ }
-    titleSyncing = false;
-  }
-
-  function watchTitleLockIndicator() {
-    if (!SHOW_TITLE_LOCK_INDICATOR) return;
-
-    function bindTitleNode(node) {
-      if (!node || node.__nllTitleBound) return;
-      node.__nllTitleBound = true;
-      try {
-        new MutationObserver(function () {
-          if (titleSyncing) return;
-          syncTitleLockIndicator();
-        }).observe(node, {
-          childList: true,
-          characterData: true,
-          subtree: true
-        });
-      } catch (e) { /* ignore */ }
-    }
-
-    function ensure() {
-      syncTitleLockIndicator();
-      var titleEl = document.querySelector('title');
-      if (titleEl) bindTitleNode(titleEl);
-    }
-
-    ensure();
-    try {
-      new MutationObserver(ensure).observe(document.documentElement || document, {
-        childList: true,
-        subtree: true
-      });
-    } catch (e) { /* ignore */ }
-    try {
-      setInterval(syncTitleLockIndicator, 2000);
-    } catch (e2) { /* ignore */ }
   }
 
   // ---------------------------------------------------------------------------
@@ -782,7 +721,7 @@
   // Boot
   // ---------------------------------------------------------------------------
 
-  watchTitleLockIndicator();
+  clearLegacyTitleLockPrefix();
   watchPeekToggleSurvival();
   syncChromeUi();
   log('Initialized; locked=', readIsLocked(), 'url=', readLockedUrl());

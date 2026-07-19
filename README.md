@@ -29,7 +29,7 @@ Optional userscripts live in [`userscripts/`](./userscripts/). The Notion favico
 
 ## Notion Locked Launcher
 
-AdGuard userscript: [`userscripts/notion-locked-launcher.user.js`](./userscripts/notion-locked-launcher.user.js) — **Cmd+Shift+L**, 🔒 title prefix, click + SPA navigation guards. Optional WebExtension (tab menu / toolbar badge): [`extensions/notion-locked-launcher/`](./extensions/notion-locked-launcher/).
+AdGuard userscript: [`userscripts/notion-locked-launcher.user.js`](./userscripts/notion-locked-launcher.user.js) — right-edge peek / **Cmd+Shift+L**, click + SPA navigation guards. Optional WebExtension (tab menu / toolbar badge): [`extensions/notion-locked-launcher/`](./extensions/notion-locked-launcher/).
 
 ## License
 

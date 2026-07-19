@@ -18,7 +18,7 @@ Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to
 1. Paste [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) into AdGuard → **Extensions** → **+**
 2. Open Notion → go to your launcher page (e.g. Tasks database)
 3. Lock with the **tiny right-edge peek** (hover to expand “Lock”) or **Cmd+Shift+L**
-4. While locked, the tab title is prefixed with **🔒**; links open in a **new** tab
+4. While locked, links open in a **new** tab; this tab stays on the saved URL
 5. Unlock from the peek control or the same shortcut (state is per-tab via `sessionStorage`)
 
 While locked, the script:
@@ -30,7 +30,6 @@ While locked, the script:
 Optional config near the top of the script:
 
 - `SHOW_PEEK_TOGGLE` (default `true`) — right-edge sliver that expands on hover
-- `SHOW_TITLE_LOCK_INDICATOR` (default `true`)
 - `GUARD_SPA_NAVIGATION` (default `true`)
 - `INTERCEPT_EXTERNAL_LINKS` (default `false`)
 - `DEBUG` (default `false`)
