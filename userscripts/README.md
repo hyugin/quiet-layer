@@ -16,9 +16,10 @@ AdGuard for Mac is **not** a browser extension; scripts may need updates if a si
 Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to-install-a-userscript-in-adguard-for-mac) below). Make sure **HTTPS filtering** is on for `notion.com` (primary), plus `notion.so` / `notion.site` if you still use those hosts.
 
 1. Paste [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) into AdGuard → **Extensions** → **+**
-2. Open Notion → go to your launcher page (e.g. Tasks database) → press **Cmd+Shift+L** to lock
-3. While locked, the tab title is prefixed with **🔒** (visible in Zen’s sidebar); links open in a **new** tab
-4. Unlock with the same shortcut (state is per-tab via `sessionStorage`)
+2. Open Notion → go to your launcher page (e.g. Tasks database)
+3. Lock with the **tiny right-edge peek** (hover to expand “Lock”) or **Cmd+Shift+L**
+4. While locked, the tab title is prefixed with **🔒**; links open in a **new** tab
+5. Unlock from the peek control or the same shortcut (state is per-tab via `sessionStorage`)
 
 While locked, the script:
 
@@ -28,6 +29,7 @@ While locked, the script:
 
 Optional config near the top of the script:
 
+- `SHOW_PEEK_TOGGLE` (default `true`) — right-edge sliver that expands on hover
 - `SHOW_TITLE_LOCK_INDICATOR` (default `true`)
 - `GUARD_SPA_NAVIGATION` (default `true`)
 - `INTERCEPT_EXTERNAL_LINKS` (default `false`)
@@ -44,7 +46,7 @@ Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inj
 3. In AdGuard → **Extensions**, confirm Notion Locked Launcher is **enabled**
 4. Fully **close all Notion tabs**, open a fresh one
 5. Open DevTools → Console and look for: `[Notion Locked Launcher] active`
-6. Press **Cmd+Shift+L** — you should get a toast and a **🔒** title prefix when locked
+6. Hover the right-edge peek or press **Cmd+Shift+L** — toast + **🔒** title prefix when locked
 
 If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering).
 
