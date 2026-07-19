@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.1.0
+// @version      1.2.0
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -41,25 +41,14 @@
  * 3. While locked, the tab title is prefixed with 🔒 (visible in Zen’s sidebar).
  * 4. Sidebar / page / relation links open in a NEW tab; this tab stays put.
  *
- * - No floating page button by default (SHOW_FLOATING_TOGGLE).
- * - Tab right-click menus are browser chrome — AdGuard userscripts cannot
- *   add items there. Use extensions/notion-locked-launcher for tab-menu UX.
  * - State is per-tab via sessionStorage (not shared across tabs).
- *
- * Design (v1)
- * -----------
- * - Capturing-phase click delegation on document finds closest <a href>.
- * - When locked and the destination differs from lockedUrl, prevent SPA
- *   navigation and window.open() the destination in a new foreground tab.
- * - Optional floating toggle (off by default); title prefix is the indicator.
- * - No history.pushState / location patching in v1.
+ * - Click capture handles <a href> navigations.
+ * - history.pushState / replaceState guards catch Notion SPA navigations that
+ *   skip real anchors (common for sidebar / peek / some buttons).
  *
  * Known limitations
  * -----------------
- * - Direct programmatic Notion navigation that does NOT go through an
- *   <a href> click is intentionally out of scope for v1 (no history hooks).
- * - Some Notion controls use buttons/divs with JS handlers, not anchors —
- *   those are left alone so editing / filters / menus keep working.
+ * - Pure JS controls with no URL change still won’t be intercepted.
  * - If the browser blocks window.open(), allow pop-ups for Notion.
  */
 
@@ -73,18 +62,17 @@
   /** When true, external (non-Notion) links also open in a new tab from a locked launcher. */
   var INTERCEPT_EXTERNAL_LINKS = false;
 
-  /**
-   * Floating on-page button. Off by default — use Cmd+Shift+L instead.
-   * Tab context menus are not reachable from a userscript; set true only if
-   * you want the old on-page control back.
-   */
-  var SHOW_FLOATING_TOGGLE = false;
-
   /** Prefix the document/tab title while locked (shows in Zen’s tab sidebar). */
   var SHOW_TITLE_LOCK_INDICATOR = true;
 
   /** Title prefix used when SHOW_TITLE_LOCK_INDICATOR is on. */
   var TITLE_LOCK_PREFIX = '🔒 ';
+
+  /**
+   * Block Notion SPA navigations (pushState/replaceState/popstate) away from
+   * the locked URL and open the destination in a new tab instead.
+   */
+  var GUARD_SPA_NAVIGATION = true;
 
   /** When true, log lock / intercept decisions to the console. */
   var DEBUG = false;
@@ -152,16 +140,16 @@
   }
 
   /**
-   * Resolve an href (relative or absolute) against the current location.
+   * Resolve an href (relative or absolute) against a base.
    * Returns null if unresolvable / empty / non-http(s).
    */
-  function resolveAbsoluteUrl(href) {
+  function resolveAbsoluteUrl(href, baseHref) {
     if (!href || typeof href !== 'string') return null;
     var trimmed = href.trim();
     if (!trimmed || trimmed.charAt(0) === '#') return null;
     if (/^(javascript|data|mailto|tel|blob):/i.test(trimmed)) return null;
     try {
-      var u = new URL(trimmed, location.href);
+      var u = new URL(trimmed, baseHref || location.href);
       if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
       return u.href;
     } catch (e) {
@@ -238,11 +226,44 @@
     else enableLock();
   }
 
-  /** Refresh title indicator + optional floating toggle after state changes. */
   function syncChromeUi() {
     syncTitleLockIndicator();
-    if (SHOW_FLOATING_TOGGLE) updateToggleUi();
-    else removeFloatingToggle();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Open URL in a new foreground tab (popup-blocker resilient)
+  // ---------------------------------------------------------------------------
+
+  function openInNewTab(url) {
+    if (!url) return false;
+
+    var win = null;
+    try {
+      win = window.open(url, '_blank', 'noopener');
+    } catch (e) {
+      win = null;
+    }
+    if (win) return true;
+
+    // Fallback: synthetic <a target=_blank> click — sometimes allowed when
+    // window.open is blocked, especially when still inside a user gesture.
+    try {
+      var root = document.documentElement || document.body;
+      if (!root) return false;
+      var a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.setAttribute(UI_ROOT_ATTR, 'open');
+      a.style.cssText = 'display:none!important';
+      root.appendChild(a);
+      a.click();
+      if (a.parentNode) a.parentNode.removeChild(a);
+      return true;
+    } catch (e2) {
+      log('openInNewTab failed', e2);
+      return false;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -357,178 +378,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Floating toggle UI
-  // ---------------------------------------------------------------------------
-
-  var TOGGLE_ID = 'nll-lock-toggle';
-
-  /** Inline styles survive Notion style resets better than a stylesheet alone. */
-  function applyToggleInlineStyles(btn, locked) {
-    btn.style.cssText = [
-      'position:fixed',
-      'top:12px',
-      'right:12px',
-      'z-index:2147483647',
-      'display:inline-flex',
-      'align-items:center',
-      'gap:6px',
-      'padding:8px 12px',
-      'margin:0',
-      'border:1px solid ' + (locked ? 'rgba(35,131,226,.45)' : 'rgba(55,53,47,.22)'),
-      'border-radius:999px',
-      'cursor:pointer',
-      'user-select:none',
-      '-webkit-user-select:none',
-      'background:' + (locked ? 'rgba(35,131,226,.18)' : 'rgba(255,255,255,.96)'),
-      'color:' + (locked ? '#0B6BCB' : '#37352f'),
-      'font:12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-      'box-shadow:0 2px 12px rgba(15,15,15,.18)',
-      'backdrop-filter:blur(8px)',
-      '-webkit-backdrop-filter:blur(8px)',
-      'pointer-events:auto',
-      'opacity:1',
-      'visibility:visible',
-      'transform:none'
-    ].join(';');
-  }
-
-  function ensureToggleStyles(doc) {
-    if (doc.getElementById('nll-toggle-style')) return;
-    var style = doc.createElement('style');
-    style.id = 'nll-toggle-style';
-    style.textContent =
-      '#' + TOGGLE_ID + '{' +
-        'position:fixed!important;top:12px!important;right:12px!important;' +
-        'z-index:2147483647!important;pointer-events:auto!important;' +
-      '}' +
-      '#' + UI_ROOT_ATTR + '-toast{pointer-events:none!important;}';
-    (doc.head || doc.documentElement).appendChild(style);
-  }
-
-  function updateToggleUi() {
-    if (!SHOW_FLOATING_TOGGLE) {
-      removeFloatingToggle();
-      return;
-    }
-    var btn = document.getElementById(TOGGLE_ID);
-    if (!btn) return;
-    var locked = readIsLocked();
-    btn.textContent = locked ? '🔒 Tab locked' : '🔓 Lock this tab';
-    btn.setAttribute('aria-pressed', locked ? 'true' : 'false');
-    btn.title = locked
-      ? 'Unlock this tab (Cmd+Shift+L)'
-      : 'Lock this tab as a Notion launcher (Cmd+Shift+L)';
-    applyToggleInlineStyles(btn, locked);
-  }
-
-  function removeFloatingToggle() {
-    var btn = document.getElementById(TOGGLE_ID);
-    if (btn && btn.parentNode) {
-      try { btn.parentNode.removeChild(btn); } catch (e) { /* ignore */ }
-    }
-  }
-
-  function mountToggle() {
-    if (!SHOW_FLOATING_TOGGLE) {
-      removeFloatingToggle();
-      return;
-    }
-    var doc = document;
-    if (!doc.documentElement) return;
-    ensureToggleStyles(doc);
-
-    var existing = doc.getElementById(TOGGLE_ID);
-    if (existing) {
-      // Notion sometimes moves nodes; keep ours on documentElement.
-      if (existing.parentNode !== doc.documentElement &&
-          existing.parentNode !== doc.body) {
-        (doc.documentElement || doc.body).appendChild(existing);
-      }
-      updateToggleUi();
-      return;
-    }
-
-    var parent = doc.documentElement || doc.body;
-    if (!parent) return;
-
-    var btn = doc.createElement('button');
-    btn.type = 'button';
-    btn.id = TOGGLE_ID;
-    btn.setAttribute(UI_ROOT_ATTR, 'toggle');
-    btn.setAttribute('aria-label', 'Toggle Notion locked launcher for this tab');
-
-    // Keep Notion from treating this as a page interaction / selection start.
-    function stopNotion(e) {
-      e.stopPropagation();
-    }
-    btn.addEventListener('mousedown', stopNotion, true);
-    btn.addEventListener('mouseup', stopNotion, true);
-    btn.addEventListener('pointerdown', stopNotion, true);
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
-      toggleLock();
-    }, true);
-
-    parent.appendChild(btn);
-    updateToggleUi();
-    log('Toggle mounted');
-  }
-
-  /**
-   * Notion React trees re-render often. Re-attach the floating control if it
-   * disappears, without depending on Notion-specific sidebar selectors.
-   */
-  function watchToggleSurvival() {
-    var started = false;
-    var obs = new MutationObserver(function () {
-      if (!document.getElementById(TOGGLE_ID)) {
-        mountToggle();
-      }
-    });
-
-    function start() {
-      if (started) {
-        mountToggle();
-        return;
-      }
-      var root = document.documentElement || document.body;
-      if (!root) return;
-      started = true;
-      mountToggle();
-      try {
-        obs.observe(root, { childList: true, subtree: true });
-      } catch (e) { /* ignore */ }
-      // Belt-and-suspenders for aggressive SPA remounts (Zen/Firefox + Notion).
-      try {
-        setInterval(function () {
-          if (!document.getElementById(TOGGLE_ID)) mountToggle();
-        }, 1500);
-      } catch (e2) { /* ignore */ }
-    }
-
-    if (document.documentElement || document.body) start();
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-    try {
-      var boot = new MutationObserver(function () {
-        if (document.documentElement || document.body) {
-          boot.disconnect();
-          start();
-        }
-      });
-      boot.observe(document, { childList: true, subtree: true });
-    } catch (e) { /* ignore */ }
-    // Late safety net if document-start observers miss the first paint.
-    try {
-      setTimeout(start, 0);
-      setTimeout(start, 500);
-      setTimeout(start, 2000);
-    } catch (e3) { /* ignore */ }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Click interception
+  // Click interception (<a href>)
   // ---------------------------------------------------------------------------
 
   function isModifiedClick(e) {
@@ -559,14 +409,40 @@
     return false;
   }
 
+  function shouldOpenDestination(dest) {
+    if (!dest) return false;
+    if (!readIsLocked()) return false;
+
+    var lockedUrl = readLockedUrl();
+    if (!lockedUrl) {
+      lockedUrl = location.href;
+      try {
+        sessionStorage.setItem(STORAGE_KEY_URL, lockedUrl);
+      } catch (err) { /* ignore */ }
+    }
+
+    var destIsNotion = isNotionUrl(dest);
+    if (!destIsNotion && !INTERCEPT_EXTERNAL_LINKS) {
+      log('Skip: external link (INTERCEPT_EXTERNAL_LINKS=false)', dest);
+      return false;
+    }
+
+    if (!isMeaningfullyDifferentUrl(dest, lockedUrl)) {
+      log('Skip: destination matches locked URL', dest);
+      return false;
+    }
+
+    if (!isMeaningfullyDifferentUrl(dest, location.href)) {
+      log('Skip: destination matches current location', dest);
+      return false;
+    }
+
+    return true;
+  }
+
   /**
    * Capturing-phase handler. Runs before Notion’s React listeners so we can
    * stop SPA routing for locked-tab navigations.
-   *
-   * NOTE (v1 scope): Direct programmatic Notion navigation that does not go
-   * through an anchor click (e.g. internal router calls without an <a href>)
-   * is intentionally out of scope — we do not patch history.pushState or
-   * window.location.
    */
   function onClickCapture(e) {
     // Only primary (left) button, unmodified.
@@ -589,43 +465,10 @@
       return;
     }
 
-    if (!readIsLocked()) return;
-
-    var lockedUrl = readLockedUrl();
-    if (!lockedUrl) {
-      // Recover: treat current URL as locked if flag is set without URL.
-      lockedUrl = location.href;
-      try {
-        sessionStorage.setItem(STORAGE_KEY_URL, lockedUrl);
-      } catch (err) { /* ignore */ }
-    }
-
     var dest = resolveAbsoluteUrl(anchor.getAttribute('href'));
-    if (!dest) {
-      log('Skip: could not resolve href', anchor.getAttribute('href'));
-      return;
-    }
+    if (!shouldOpenDestination(dest)) return;
 
-    var destIsNotion = isNotionUrl(dest);
-    if (!destIsNotion && !INTERCEPT_EXTERNAL_LINKS) {
-      log('Skip: external link (INTERCEPT_EXTERNAL_LINKS=false)', dest);
-      return;
-    }
-
-    // Same page (ignoring hash) — do not open a duplicate tab.
-    if (!isMeaningfullyDifferentUrl(dest, lockedUrl)) {
-      log('Skip: destination matches locked URL', dest);
-      return;
-    }
-
-    // Also skip if destination equals the current location (same rules) —
-    // keeps us from fighting in-page hash or no-op links while locked.
-    if (!isMeaningfullyDifferentUrl(dest, location.href)) {
-      log('Skip: destination matches current location', dest);
-      return;
-    }
-
-    log('Intercept → new tab', dest);
+    log('Intercept click → new tab', dest);
 
     e.preventDefault();
     e.stopPropagation();
@@ -633,22 +476,82 @@
       e.stopImmediatePropagation();
     }
 
-    // window.open from a trusted click gesture → foreground tab in Firefox.
-    var win = null;
-    try {
-      win = window.open(dest, '_blank', 'noopener');
-    } catch (err) {
-      win = null;
-    }
-
-    if (!win) {
+    if (!openInNewTab(dest)) {
       showToast('Pop-up blocked — allow pop-ups for Notion, then try again.');
-      log('window.open blocked for', dest);
+      log('openInNewTab blocked for', dest);
     }
   }
 
   // Install as early as possible (@run-at document-start).
   document.addEventListener('click', onClickCapture, true);
+
+  // ---------------------------------------------------------------------------
+  // SPA navigation guard (pushState / replaceState / popstate)
+  // ---------------------------------------------------------------------------
+
+  var restoringHome = false;
+
+  function shouldBlockHistoryUrl(url) {
+    if (!GUARD_SPA_NAVIGATION) return false;
+    if (!readIsLocked() || restoringHome) return false;
+    if (url == null || url === '') return false;
+    var abs = resolveAbsoluteUrl(String(url), location.href);
+    return shouldOpenDestination(abs) ? abs : null;
+  }
+
+  function blockHistoryAndOpen(abs) {
+    log('Intercept history → new tab', abs);
+    if (!openInNewTab(abs)) {
+      showToast('Pop-up blocked — allow pop-ups for Notion, then try again.');
+    }
+    // Do not apply the history mutation — launcher tab stays on locked URL.
+  }
+
+  function installHistoryGuards() {
+    if (!GUARD_SPA_NAVIGATION) return;
+    if (history.__nllGuarded) return;
+    history.__nllGuarded = true;
+
+    var origPush = history.pushState;
+    var origReplace = history.replaceState;
+
+    history.pushState = function (state, title, url) {
+      var blocked = shouldBlockHistoryUrl(url);
+      if (blocked) {
+        blockHistoryAndOpen(blocked);
+        return;
+      }
+      return origPush.apply(this, arguments);
+    };
+
+    history.replaceState = function (state, title, url) {
+      var blocked = shouldBlockHistoryUrl(url);
+      if (blocked) {
+        blockHistoryAndOpen(blocked);
+        return;
+      }
+      return origReplace.apply(this, arguments);
+    };
+
+    window.addEventListener('popstate', function () {
+      if (!GUARD_SPA_NAVIGATION || !readIsLocked() || restoringHome) return;
+      var locked = readLockedUrl();
+      if (!locked) return;
+      if (!isMeaningfullyDifferentUrl(location.href, locked)) return;
+
+      var drifted = location.href;
+      log('popstate drift → new tab + restore', drifted);
+      openInNewTab(drifted);
+      restoringHome = true;
+      try {
+        location.replace(locked);
+      } catch (e) {
+        restoringHome = false;
+      }
+    });
+  }
+
+  installHistoryGuards();
 
   // ---------------------------------------------------------------------------
   // Keyboard shortcut: Cmd+Shift+L (macOS) / Ctrl+Shift+L (elsewhere)
@@ -671,9 +574,7 @@
                       : e.ctrlKey && !e.metaKey && !e.altKey;
     if (!chord) return;
 
-    // Don’t steal the shortcut from editable fields unless we still want
-    // global toggle — launcher use-case prefers global, so allow it, but
-    // skip when an IME composition is active.
+    // Global toggle (launcher use-case); skip only during IME composition.
     if (e.isComposing) return;
 
     e.preventDefault();
@@ -684,12 +585,10 @@
   window.addEventListener('keydown', onKeyDown, true);
 
   // ---------------------------------------------------------------------------
-  // Boot UI
+  // Boot
   // ---------------------------------------------------------------------------
 
   watchTitleLockIndicator();
-  if (SHOW_FLOATING_TOGGLE) watchToggleSurvival();
-  else removeFloatingToggle();
   syncChromeUi();
   log('Initialized; locked=', readIsLocked(), 'url=', readLockedUrl());
 })();

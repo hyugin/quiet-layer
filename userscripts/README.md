@@ -13,8 +13,6 @@ AdGuard for Mac is **not** a browser extension; scripts may need updates if a si
 
 ### Notion Locked Launcher
 
-**Zen / Firefox:** prefer the WebExtension in [`../extensions/notion-locked-launcher/`](../extensions/notion-locked-launcher/) (tab context menu + toolbar badge + Cmd+Shift+L, no on-page button). The AdGuard userscript below remains when you want AdGuard-managed injection instead.
-
 Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to-install-a-userscript-in-adguard-for-mac) below). Make sure **HTTPS filtering** is on for `notion.com` (primary), plus `notion.so` / `notion.site` if you still use those hosts.
 
 1. Paste [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) into AdGuard → **Extensions** → **+**
@@ -22,14 +20,20 @@ Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to
 3. While locked, the tab title is prefixed with **🔒** (visible in Zen’s sidebar); links open in a **new** tab
 4. Unlock with the same shortcut (state is per-tab via `sessionStorage`)
 
-There is **no floating page button** by default. Optional config near the top of the script:
+While locked, the script:
 
-- `SHOW_FLOATING_TOGGLE` (default `false`) — set `true` to bring back the on-page button
+- Intercepts `<a href>` clicks (capturing phase)
+- Guards `history.pushState` / `replaceState` / `popstate` so Notion SPA navigations that skip anchors still open in a new tab
+- Leaves the locked tab on the saved URL
+
+Optional config near the top of the script:
+
 - `SHOW_TITLE_LOCK_INDICATOR` (default `true`)
+- `GUARD_SPA_NAVIGATION` (default `true`)
 - `INTERCEPT_EXTERNAL_LINKS` (default `false`)
 - `DEBUG` (default `false`)
 
-Tab right-click menus are browser chrome — AdGuard userscripts cannot add items there. Use the [WebExtension](../extensions/notion-locked-launcher/) for tab-menu / toolbar UX.
+Want a tab context menu / toolbar badge instead? Optional [WebExtension](../extensions/notion-locked-launcher/).
 
 #### Zen Browser: script not injecting?
 

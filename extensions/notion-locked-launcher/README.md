@@ -8,7 +8,7 @@ Chrome UX only — **no on-page floating button**. Toggle via:
 - Toolbar action (badge shows **ON** when locked)
 - **Cmd+Shift+L** (macOS) / **Ctrl+Shift+L** (Windows/Linux)
 
-Firefox/Zen WebExtension for the same behavior as the AdGuard userscript in [`userscripts/notion-locked-launcher.user.js`](../../userscripts/notion-locked-launcher.user.js), with tab-chrome UX and sandboxed permissions (no AdGuard HTTPS filtering required).
+Optional Firefox/Zen WebExtension for tab-chrome UX (context menu + toolbar badge) without AdGuard HTTPS filtering. For the default AdGuard path (including SPA history guards), prefer [`userscripts/notion-locked-launcher.user.js`](../../userscripts/notion-locked-launcher.user.js).
 
 ## Why an extension?
 
