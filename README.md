@@ -27,9 +27,9 @@ https://raw.githubusercontent.com/hyugin/quiet-layer/main/quiet-layer.txt
 
 Optional userscripts live in [`userscripts/`](./userscripts/). The Notion favicon lock is also included as an AdGuard JS rule in `quiet-layer.txt` (enable **Allow scripts and CSS / trusted** on this filter). See [`userscripts/README.md`](./userscripts/README.md).
 
-## Notion Locked Launcher (Zen / Firefox)
+## Notion Locked Launcher
 
-WebExtension in [`extensions/notion-locked-launcher/`](./extensions/notion-locked-launcher/) (tab menu + toolbar badge + Cmd+Shift+L). Load from `about:debugging`. For AdGuard-managed injection instead, see [`userscripts/notion-locked-launcher.user.js`](./userscripts/notion-locked-launcher.user.js).
+AdGuard userscript: [`userscripts/notion-locked-launcher.user.js`](./userscripts/notion-locked-launcher.user.js) — **Cmd+Shift+L**, 🔒 title prefix, click + SPA navigation guards. Optional WebExtension (tab menu / toolbar badge): [`extensions/notion-locked-launcher/`](./extensions/notion-locked-launcher/).
 
 ## License
 
