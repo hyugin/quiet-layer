@@ -1,7 +1,7 @@
 /**
  * Background (event page) for Notion Locked Launcher.
  *
- * Chrome half of the former Sine mod:
+ * Background responsibilities:
  * - Tab context menu + toolbar action + Cmd/Ctrl+Shift+L
  * - Per-tab lock state (in-memory; cleared when the tab closes)
  * - Open intercepted URLs in a new foreground tab

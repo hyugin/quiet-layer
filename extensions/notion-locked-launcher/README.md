@@ -8,14 +8,13 @@ Chrome UX only — **no on-page floating button**. Toggle via:
 - Toolbar action (badge shows **ON** when locked)
 - **Cmd+Shift+L** (macOS) / **Ctrl+Shift+L** (Windows/Linux)
 
-This is the WebExtension port of the Sine mod in [`sine-mods/notion-locked-launcher/`](../../sine-mods/notion-locked-launcher/) and the AdGuard userscript in [`userscripts/notion-locked-launcher.user.js`](../../userscripts/notion-locked-launcher.user.js). Prefer this in Zen/Firefox — sandboxed permissions, no Sine, no AdGuard HTTPS filtering.
+Firefox/Zen WebExtension for the same behavior as the AdGuard userscript in [`userscripts/notion-locked-launcher.user.js`](../../userscripts/notion-locked-launcher.user.js), with tab-chrome UX and sandboxed permissions (no AdGuard HTTPS filtering required).
 
 ## Why an extension?
 
 | Approach | Trust surface | UX |
 | --- | --- | --- |
 | **This extension** | Declared Notion host permissions + `tabs` / `menus` | Tab menu, shortcut, toolbar badge |
-| Sine mod | Chrome-privileged JS loader | Tab menu + tab chrome styling |
 | AdGuard userscript | AdGuard injection into the page | On-page button + shortcut |
 
 ## Install (temporary — good for trying)
@@ -54,13 +53,12 @@ DevTools console on a Notion page should show:
 ## Usage
 
 - Menu item only appears on Notion tabs (`notion.com` / `notion.so` / `notion.site`).
-- Middle-click, Cmd/Ctrl/Shift/Alt-click, `target=_blank`, downloads, and non-Notion externals are left alone (same defaults as the Sine mod / userscript).
+- Middle-click, Cmd/Ctrl/Shift/Alt-click, `target=_blank`, downloads, and non-Notion externals are left alone (same defaults as the userscript).
 - Lock state is **per-tab** in the background script memory. Closing the tab clears it. It is not written to disk.
 
 ## Known limitations
 
-- **No tab-chrome outline / lock prefix** — WebExtensions cannot style Zen/Firefox tab strips the way Sine’s `userChrome` CSS can. Use the toolbar **ON** badge instead.
-- **No Zen “Replace pinned URL” sync** — that API is chrome-privileged; pin/reset behavior is unchanged.
+- **No tab-strip outline / lock prefix** — WebExtensions cannot style the Zen/Firefox tab strip; use the toolbar **ON** badge instead.
 - **Programmatic Notion navigation** that does not go through an `<a href>` click is out of scope (no `history.pushState` / `location` patching).
 - Shortcut may conflict if another extension already owns **Cmd/Ctrl+Shift+L** — rebind under `about:addons` → gear → **Manage Extension Shortcuts**.
 

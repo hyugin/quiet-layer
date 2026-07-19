@@ -1,9 +1,9 @@
 /**
  * Content script for Notion Locked Launcher.
  *
- * Port of the Sine JSWindowActor child: capturing-phase click interception
- * on a[href] while locked. No on-page floating button — toggle via tab
- * context menu, toolbar action, or Cmd/Ctrl+Shift+L.
+ * Capturing-phase click interception on a[href] while locked.
+ * No on-page floating button — toggle via tab context menu, toolbar
+ * action, or Cmd/Ctrl+Shift+L.
  */
 
 (function () {

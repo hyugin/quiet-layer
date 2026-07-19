@@ -29,9 +29,7 @@ Optional userscripts live in [`userscripts/`](./userscripts/). The Notion favico
 
 ## Notion Locked Launcher (Zen / Firefox)
 
-Preferred: the WebExtension in [`extensions/notion-locked-launcher/`](./extensions/notion-locked-launcher/) (tab menu + toolbar badge + Cmd+Shift+L). Load it from `about:debugging` — no Sine, no AdGuard injection.
-
-Alternatives: [AdGuard userscript](./userscripts/notion-locked-launcher.user.js), or the [Sine mod](./sine-mods/notion-locked-launcher/) if you already run Sine.
+WebExtension in [`extensions/notion-locked-launcher/`](./extensions/notion-locked-launcher/) (tab menu + toolbar badge + Cmd+Shift+L). Load from `about:debugging`. For AdGuard-managed injection instead, see [`userscripts/notion-locked-launcher.user.js`](./userscripts/notion-locked-launcher.user.js).
 
 ## License
 
