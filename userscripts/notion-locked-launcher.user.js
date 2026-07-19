@@ -789,8 +789,8 @@
     el.title = meta.name + ' — click to toggle · Alt+click to cycle variants · Cmd+Shift+L';
 
     if (showTags) {
-      var tagTop = (num === 4 || num === 5);
-      el.appendChild(makeTag(doc, num, tagTop));
+      // Top-bar sits in the header; tag above it. Others get a side index.
+      el.appendChild(makeTag(doc, num, num === 4));
     }
 
     return el;
