@@ -10,6 +10,28 @@ AdGuard for Mac is **not** a browser extension; scripts may need updates if a si
 | --- | --- |
 | [`notion-favicon-lock.user.js`](./notion-favicon-lock.user.js) | Keep the Notion tab favicon locked to the default Notion logo |
 | [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) | Lock a Notion tab as a launcher: nav links open in new tabs; the locked tab stays put |
+| [`open-in-new-tab.user.js`](./open-in-new-tab.user.js) | On allowlisted apps (GitHub / Jira / Notion), same-origin links always open in a new tab — no lock toggle |
+
+### Open In New Tab (Allowlist)
+
+Lighter alternative to Notion Locked Launcher: **always on** for configured hosts (no peek UI, no shortcut, no per-tab lock state).
+
+1. Paste [`open-in-new-tab.user.js`](./open-in-new-tab.user.js) into AdGuard → **Extensions** → **+** (or install with [Violentmonkey](https://addons.mozilla.org/en-US/firefox/addon/violentmonkey/) on Firefox / Zen)
+2. Enable **HTTPS filtering** for each host you use (`github.com`, your `*.atlassian.net`, `notion.com`, …)
+3. On those sites, same-origin in-app links open in a **new** tab; the current tab stays put
+
+Default allowlist: **GitHub**, **Jira** (`*.atlassian.net`), **Notion**. Edit near the top of the script:
+
+- `ALLOW_HOSTS` — hostnames / RegExps where the script is active (also add a matching `@match` / `@include`)
+- `ALLOW_PATH_PREFIXES` — optional; narrow to certain paths on a host
+- `GUARD_SPA_NAVIGATION` (default `false`) — SPA `history` guards on **all** allowlisted hosts (usually too aggressive for GitHub/Jira)
+- `GUARD_SPA_HOSTS` — hosts that get SPA guards anyway (defaults to Notion)
+- `INTERCEPT_EXTERNAL_LINKS` (default `false`)
+- `DEBUG` (default `false`)
+
+Do **not** run this and Notion Locked Launcher on Notion at the same time — they both intercept navigations. Prefer Locked Launcher when you want an on/off pin; prefer this script when you want always-on new tabs on several apps.
+
+Console line when injected: `[Open In New Tab] v1.0.0 active — same-origin links → new tab`
 
 ### Notion Locked Launcher
 
