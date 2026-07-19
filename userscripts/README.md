@@ -29,9 +29,9 @@ There is **no floating page button** by default. Optional config near the top of
 - `INTERCEPT_EXTERNAL_LINKS` (default `false`)
 - `DEBUG` (default `false`)
 
-Tab right-click menus are browser chrome — AdGuard userscripts cannot add items there (that would need a Zen Mod / privileged extension).
+Tab right-click menus are browser chrome — AdGuard userscripts cannot add items there. Use the [WebExtension](../extensions/notion-locked-launcher/) for tab-menu / toolbar UX.
 
-#### Zen Browser: toggle not showing?
+#### Zen Browser: script not injecting?
 
 Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inject.
 

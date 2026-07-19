@@ -43,7 +43,7 @@
  *
  * - No floating page button by default (SHOW_FLOATING_TOGGLE).
  * - Tab right-click menus are browser chrome — AdGuard userscripts cannot
- *   add items there. A Zen Mod / privileged extension would be required.
+ *   add items there. Use extensions/notion-locked-launcher for tab-menu UX.
  * - State is per-tab via sessionStorage (not shared across tabs).
  *
  * Design (v1)
