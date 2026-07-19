@@ -18,13 +18,20 @@ AdGuard for Mac is **not** a browser extension; scripts may need updates if a si
 Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to-install-a-userscript-in-adguard-for-mac) below). Make sure **HTTPS filtering** is on for `notion.com` (primary), plus `notion.so` / `notion.site` if you still use those hosts.
 
 1. Paste [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) into AdGuard → **Extensions** → **+**
-2. Open Notion → go to your launcher page (e.g. Tasks database) → click **🔓 Lock this tab** (top-right) or press **Cmd+Shift+L**
-3. Sidebar / page / relation links open in a **new** tab; the locked tab stays on the exact saved URL
-4. Unlock with the same control or shortcut (state is per-tab via `sessionStorage`)
+2. Open Notion → go to your launcher page (e.g. Tasks database) → press **Cmd+Shift+L** to lock
+3. While locked, the tab title is prefixed with **🔒** (visible in Zen’s sidebar); links open in a **new** tab
+4. Unlock with the same shortcut (state is per-tab via `sessionStorage`)
 
-Optional config near the top of the script: `INTERCEPT_EXTERNAL_LINKS` (default `false`), `DEBUG` (default `false`).
+There is **no floating page button** by default. Optional config near the top of the script:
 
-#### Zen Browser: toggle not showing?
+- `SHOW_FLOATING_TOGGLE` (default `false`) — set `true` to bring back the on-page button
+- `SHOW_TITLE_LOCK_INDICATOR` (default `true`)
+- `INTERCEPT_EXTERNAL_LINKS` (default `false`)
+- `DEBUG` (default `false`)
+
+Tab right-click menus are browser chrome — AdGuard userscripts cannot add items there. Use the [WebExtension](../extensions/notion-locked-launcher/) for tab-menu / toolbar UX.
+
+#### Zen Browser: script not injecting?
 
 Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inject.
 
@@ -33,8 +40,9 @@ Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inj
 3. In AdGuard → **Extensions**, confirm Notion Locked Launcher is **enabled**
 4. Fully **close all Notion tabs**, open a fresh one
 5. Open DevTools → Console and look for: `[Notion Locked Launcher] active`
+6. Press **Cmd+Shift+L** — you should get a toast and a **🔒** title prefix when locked
 
-If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering). If the line is present but no button, try **Cmd+Shift+L** — lock still works without the button.
+If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering).
 
 ## Preferred: Quiet Layer filter JS rule (AdGuard)
 
