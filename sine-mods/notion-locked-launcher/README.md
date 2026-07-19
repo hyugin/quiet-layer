@@ -24,9 +24,19 @@ State is **per-tab** (stored on the XUL tab), not global. The content actor re-s
 
 ## Install (local Sine)
 
-Requires [Sine](https://github.com/CosmoCreeper/Sine) in Zen Browser (macOS OK).
+This mod needs **[Sine](https://github.com/CosmoCreeper/Sine)** — a third-party mod manager — not Zen’s built-in **Zen Mods** pane.
 
-1. Open **Settings → Sine** (or Cosine).
+**Zen Mods ≠ Sine.** Settings → **Zen Mods** is Zen’s own store. Sine only appears in Settings after you install it separately. If you only see Zen Mods (and no Sine / Sine Mods / Cosine entry), Sine is not installed yet.
+
+### 1. Install Sine first
+
+1. Follow the [Sine installation guide](https://github.com/sineorg/docs/blob/main/src/installation.md) (easiest: download the installer for your OS from [Sine releases](https://github.com/CosmoCreeper/Sine/releases/latest)).
+2. Restart Zen.
+3. Confirm Sine is present: open Settings and look for **Sine**, **Sine Mods**, or **Cosine**, or go directly to `about:preferences#sineMods`.
+
+### 2. Install this mod from GitHub
+
+1. Open **Settings → Sine** / **Sine Mods** (or **Cosine**), or `about:preferences#sineMods`.
 2. Open the Sine **gear / settings** and enable **“Enable installing JS from unofficial sources”** (unsafe; local/trusted repos only).
 3. Under **“add your own locally from a GitHub repo”**, paste either:
    - `https://github.com/hyugin/quiet-layer/tree/main/sine-mods/notion-locked-launcher`

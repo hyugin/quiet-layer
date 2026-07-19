@@ -29,7 +29,7 @@ Optional userscripts live in [`userscripts/`](./userscripts/). The Notion favico
 
 ## Zen Browser (Sine)
 
-[`sine-mods/notion-locked-launcher/`](./sine-mods/notion-locked-launcher/) is a Sine mod that locks a Notion tab as a launcher (tab menu + Cmd+Shift+L). See that folder’s README for local Sine install steps.
+[`sine-mods/notion-locked-launcher/`](./sine-mods/notion-locked-launcher/) is a [Sine](https://github.com/CosmoCreeper/Sine) mod that locks a Notion tab as a launcher (tab menu + Cmd+Shift+L). It does **not** install via Zen’s built-in **Zen Mods** — install Sine first, then add the mod from that folder’s README.
 
 ## License
 
