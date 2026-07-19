@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.2.0
+// @version      1.2.1
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -37,7 +37,7 @@
  * Usage
  * -----
  * 1. Open Notion → go to your launcher page (e.g. Tasks database).
- * 2. Press Cmd+Shift+L to lock (same chord unlocks).
+ * 2. Lock via the tiny right-edge peek control (hover to expand) or Cmd+Shift+L.
  * 3. While locked, the tab title is prefixed with 🔒 (visible in Zen’s sidebar).
  * 4. Sidebar / page / relation links open in a NEW tab; this tab stays put.
  *
@@ -67,6 +67,12 @@
 
   /** Title prefix used when SHOW_TITLE_LOCK_INDICATOR is on. */
   var TITLE_LOCK_PREFIX = '🔒 ';
+
+  /**
+   * Tiny right-edge peek chip. Collapsed to a sliver; hover/focus expands the
+   * label. Set false to rely on the keyboard shortcut only.
+   */
+  var SHOW_PEEK_TOGGLE = true;
 
   /**
    * Block Notion SPA navigations (pushState/replaceState/popstate) away from
@@ -228,6 +234,8 @@
 
   function syncChromeUi() {
     syncTitleLockIndicator();
+    if (SHOW_PEEK_TOGGLE) updatePeekToggle();
+    else removePeekToggle();
   }
 
   // ---------------------------------------------------------------------------
@@ -375,6 +383,192 @@
     toastTimer = setTimeout(function () {
       el.classList.remove('nll-show');
     }, TOAST_MS);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Peek toggle (right-edge sliver → expands on hover)
+  // ---------------------------------------------------------------------------
+
+  var PEEK_ID = 'nll-peek-toggle';
+
+  function ensurePeekStyles(doc) {
+    if (doc.getElementById('nll-peek-style')) return;
+    var style = doc.createElement('style');
+    style.id = 'nll-peek-style';
+    style.textContent =
+      '#' + PEEK_ID + '{' +
+        'position:fixed!important;top:68px!important;right:0!important;' +
+        'z-index:2147483647!important;box-sizing:border-box!important;' +
+        'display:inline-flex!important;align-items:center!important;' +
+        'gap:6px!important;height:26px!important;max-width:none!important;' +
+        'padding:0 10px 0 7px!important;margin:0!important;' +
+        'border:1px solid rgba(55,53,47,.18)!important;border-right:none!important;' +
+        'border-radius:999px 0 0 999px!important;' +
+        'background:rgba(255,255,255,.92)!important;color:#37352f!important;' +
+        'font:11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
+        'letter-spacing:.01em!important;white-space:nowrap!important;' +
+        'box-shadow:-2px 2px 10px rgba(15,15,15,.08)!important;' +
+        'backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;' +
+        'cursor:pointer!important;user-select:none!important;' +
+        'transform:translateX(calc(100% - 12px))!important;' +
+        'transition:transform .18s ease,background .15s ease,color .15s ease,border-color .15s ease!important;' +
+        'opacity:.72!important;pointer-events:auto!important;' +
+      '}' +
+      '#' + PEEK_ID + ':hover,#' + PEEK_ID + ':focus-visible,#' + PEEK_ID + '.nll-expanded{' +
+        'transform:translateX(0)!important;opacity:1!important;outline:none!important;' +
+      '}' +
+      '#' + PEEK_ID + '[aria-pressed="true"]{' +
+        'background:rgba(35,131,226,.16)!important;color:#0B6BCB!important;' +
+        'border-color:rgba(35,131,226,.35)!important;opacity:.95!important;' +
+        'transform:translateX(calc(100% - 16px))!important;' +
+      '}' +
+      '#' + PEEK_ID + '[aria-pressed="true"]:hover,#' + PEEK_ID + '[aria-pressed="true"]:focus-visible,#' + PEEK_ID + '[aria-pressed="true"].nll-expanded{' +
+        'transform:translateX(0)!important;' +
+      '}' +
+      '#' + PEEK_ID + ' .nll-peek-icon{' +
+        'flex:0 0 auto!important;width:12px!important;text-align:center!important;' +
+        'font-size:11px!important;line-height:1!important;' +
+      '}' +
+      '#' + PEEK_ID + ' .nll-peek-label{' +
+        'flex:0 1 auto!important;overflow:hidden!important;' +
+      '}';
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+
+  function removePeekToggle() {
+    var btn = document.getElementById(PEEK_ID);
+    if (btn && btn.parentNode) {
+      try { btn.parentNode.removeChild(btn); } catch (e) { /* ignore */ }
+    }
+  }
+
+  function updatePeekToggle() {
+    if (!SHOW_PEEK_TOGGLE) {
+      removePeekToggle();
+      return;
+    }
+    var btn = document.getElementById(PEEK_ID);
+    if (!btn) return;
+    var locked = readIsLocked();
+    var icon = btn.querySelector('.nll-peek-icon');
+    var label = btn.querySelector('.nll-peek-label');
+    if (icon) icon.textContent = locked ? '🔒' : '🔓';
+    if (label) label.textContent = locked ? 'Locked' : 'Lock';
+    btn.setAttribute('aria-pressed', locked ? 'true' : 'false');
+    btn.title = locked
+      ? 'Unlock launcher (Cmd+Shift+L)'
+      : 'Lock this tab as launcher (Cmd+Shift+L)';
+  }
+
+  function mountPeekToggle() {
+    if (!SHOW_PEEK_TOGGLE) {
+      removePeekToggle();
+      return;
+    }
+    var doc = document;
+    if (!doc.documentElement) return;
+    ensurePeekStyles(doc);
+
+    var existing = doc.getElementById(PEEK_ID);
+    if (existing) {
+      if (existing.parentNode !== doc.documentElement &&
+          existing.parentNode !== doc.body) {
+        (doc.documentElement || doc.body).appendChild(existing);
+      }
+      updatePeekToggle();
+      return;
+    }
+
+    var parent = doc.documentElement || doc.body;
+    if (!parent) return;
+
+    var btn = doc.createElement('button');
+    btn.type = 'button';
+    btn.id = PEEK_ID;
+    btn.setAttribute(UI_ROOT_ATTR, 'peek');
+    btn.setAttribute('aria-label', 'Toggle Notion locked launcher for this tab');
+
+    var icon = doc.createElement('span');
+    icon.className = 'nll-peek-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    var label = doc.createElement('span');
+    label.className = 'nll-peek-label';
+    btn.appendChild(icon);
+    btn.appendChild(label);
+
+    function stopNotion(e) {
+      e.stopPropagation();
+    }
+    btn.addEventListener('mousedown', stopNotion, true);
+    btn.addEventListener('mouseup', stopNotion, true);
+    btn.addEventListener('pointerdown', stopNotion, true);
+    btn.addEventListener('mouseenter', function () {
+      btn.classList.add('nll-expanded');
+    });
+    btn.addEventListener('mouseleave', function () {
+      btn.classList.remove('nll-expanded');
+    });
+    btn.addEventListener('focus', function () {
+      btn.classList.add('nll-expanded');
+    });
+    btn.addEventListener('blur', function () {
+      btn.classList.remove('nll-expanded');
+    });
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      toggleLock();
+    }, true);
+
+    parent.appendChild(btn);
+    updatePeekToggle();
+    log('Peek toggle mounted');
+  }
+
+  function watchPeekToggleSurvival() {
+    if (!SHOW_PEEK_TOGGLE) return;
+
+    var started = false;
+    var obs = new MutationObserver(function () {
+      if (!document.getElementById(PEEK_ID)) mountPeekToggle();
+    });
+
+    function start() {
+      if (started) {
+        mountPeekToggle();
+        return;
+      }
+      var root = document.documentElement || document.body;
+      if (!root) return;
+      started = true;
+      mountPeekToggle();
+      try {
+        obs.observe(root, { childList: true, subtree: true });
+      } catch (e) { /* ignore */ }
+      try {
+        setInterval(function () {
+          if (!document.getElementById(PEEK_ID)) mountPeekToggle();
+        }, 2000);
+      } catch (e2) { /* ignore */ }
+    }
+
+    if (document.documentElement || document.body) start();
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+    try {
+      var boot = new MutationObserver(function () {
+        if (document.documentElement || document.body) {
+          boot.disconnect();
+          start();
+        }
+      });
+      boot.observe(document, { childList: true, subtree: true });
+    } catch (e) { /* ignore */ }
+    try {
+      setTimeout(start, 0);
+      setTimeout(start, 500);
+      setTimeout(start, 2000);
+    } catch (e3) { /* ignore */ }
   }
 
   // ---------------------------------------------------------------------------
@@ -589,6 +783,7 @@
   // ---------------------------------------------------------------------------
 
   watchTitleLockIndicator();
+  watchPeekToggleSurvival();
   syncChromeUi();
   log('Initialized; locked=', readIsLocked(), 'url=', readLockedUrl());
 })();
