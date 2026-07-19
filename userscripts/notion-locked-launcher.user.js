@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.3.0
+// @version      1.3.1
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -82,8 +82,9 @@
    *   5 — Locked-only indicator
    *   6 — Segmented Free | Launcher
    * Alt+click any control to cycle 1→6 (sessionStorage override for this tab).
+   * Default 4 (centered top-bar) — set 'all' to compare again.
    */
-  var UI_VARIANT = 'all';
+  var UI_VARIANT = 4;
 
   /**
    * Block Notion SPA navigations (pushState/replaceState/popstate) away from
@@ -136,7 +137,7 @@
 
   // Always announce once so Zen/AdGuard injection can be verified in DevTools.
   try {
-    console.info('[Notion Locked Launcher] v1.3.0 active — UI variants or Cmd+Shift+L (Alt+click cycles)');
+    console.info('[Notion Locked Launcher] v1.3.1 active — UI variants or Cmd+Shift+L (Alt+click cycles)');
   } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
@@ -551,11 +552,12 @@
         'transform:translateX(0)!important;' +
       '}' +
 
-      /* 4 — Notion-native top bar */
+      /* 4 — Notion-native top bar (centered — clears Zen’s right sidebar / Share cluster) */
       '#' + UI_ROOT_ID + ' .nll-v-topbar{' +
-        'position:absolute!important;top:10px!important;right:210px!important;' +
+        'position:absolute!important;top:10px!important;left:50%!important;right:auto!important;' +
+        'transform:translateX(-50%)!important;' +
         'display:inline-flex!important;align-items:center!important;gap:0!important;' +
-        'height:28px!important;padding:0 8px!important;' +
+        'height:28px!important;padding:0 10px!important;' +
         'border:none!important;border-radius:6px!important;' +
         'background:transparent!important;color:rgba(55,53,47,.65)!important;' +
         'font:13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
@@ -569,6 +571,10 @@
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-topbar[aria-pressed="true"]:hover{' +
         'background:rgba(35,131,226,.16)!important;' +
+      '}' +
+      /* In all-mode, keep #4’s index tag above the centered control */
+      '#' + UI_ROOT_ID + ' .nll-v-topbar .nll-tag.nll-tag-top{' +
+        'left:50%!important;right:auto!important;transform:translateX(-50%)!important;' +
       '}' +
 
       /* 5 — Locked-only (placeholder when unlocked in test mode) */
