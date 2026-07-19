@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.3.2
+// @version      1.3.3
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -136,7 +136,7 @@
 
   // Always announce once so Zen/AdGuard injection can be verified in DevTools.
   try {
-    console.info('[Notion Locked Launcher] v1.3.2 active — Cmd+Shift+L; blue rail when locked');
+    console.info('[Notion Locked Launcher] v1.3.3 active — Cmd+Shift+L; blue rail when locked');
   } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
@@ -464,16 +464,16 @@
 
       /* indicator — locked-only blue hairline (keyboard-first default) */
       '#' + UI_ROOT_ID + ' .nll-v-indicator{' +
-        'position:absolute!important;top:50%!important;right:0!important;' +
+        'position:absolute!important;top:10%!important;right:0!important;' +
         'display:none!important;align-items:center!important;gap:8px!important;' +
-        'height:72px!important;padding:0 10px 0 0!important;' +
+        'height:70px!important;padding:0 10px 0 0!important;' +
         'border:none!important;background:transparent!important;color:#0B6BCB!important;' +
-        'transform:translate(calc(100% - 3px),-50%)!important;' +
+        'transform:translateX(calc(100% - 4px))!important;' +
         'transition:transform .18s ease,opacity .15s ease!important;' +
         'opacity:0!important;pointer-events:none!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-indicator::before{' +
-        'content:""!important;display:block!important;width:3px!important;height:100%!important;' +
+        'content:""!important;display:block!important;width:4px!important;height:100%!important;' +
         'border-radius:2px 0 0 2px!important;background:#2383e2!important;' +
         'flex:0 0 auto!important;box-shadow:-1px 0 6px rgba(35,131,226,.35)!important;' +
         'transition:width .15s ease!important;' +
@@ -487,10 +487,10 @@
         'display:inline-flex!important;opacity:.95!important;pointer-events:auto!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"].nll-expanded{' +
-        'transform:translate(0,-50%)!important;opacity:1!important;outline:none!important;' +
+        'transform:translateX(0)!important;opacity:1!important;outline:none!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:hover::before,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:focus-visible::before,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"].nll-expanded::before{' +
-        'width:4px!important;' +
+        'width:5px!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:hover .nll-label,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:focus-visible .nll-label,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"].nll-expanded .nll-label{' +
         'opacity:1!important;' +
