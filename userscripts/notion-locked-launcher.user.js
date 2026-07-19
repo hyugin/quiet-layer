@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.2.3
+// @version      1.3.0
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -37,8 +37,14 @@
  * Usage
  * -----
  * 1. Open Notion → go to your launcher page (e.g. Tasks database).
- * 2. Lock via the tiny right-edge peek control (hover to expand) or Cmd+Shift+L.
+ * 2. Lock via a UI control (see UI_VARIANT) or Cmd+Shift+L.
  * 3. Sidebar / page / relation links open in a NEW tab; this tab stays put.
+ *
+ * UI variants (test mode)
+ * ----------------------
+ * UI_VARIANT = 'all' mounts all six designs stacked for comparison.
+ * Set to 1–6 to keep one. Alt+click any control cycles the active variant
+ * (persisted in sessionStorage for this tab).
  *
  * - State is per-tab via sessionStorage (not shared across tabs).
  * - Click capture handles <a href> navigations.
@@ -62,10 +68,22 @@
   var INTERCEPT_EXTERNAL_LINKS = false;
 
   /**
-   * Tiny right-edge peek chip. Collapsed to a sliver; hover/focus expands the
-   * label. Set false to rely on the keyboard shortcut only.
+   * Show launcher UI. Set false to rely on the keyboard shortcut only.
    */
   var SHOW_PEEK_TOGGLE = true;
+
+  /**
+   * Which lock control to show:
+   *   'all' — mount all six variants stacked (A/B test; prune later)
+   *   1 — Hairline rail
+   *   2 — Corner pin
+   *   3 — Status dot + keyboard hint
+   *   4 — Notion-native top bar
+   *   5 — Locked-only indicator
+   *   6 — Segmented Free | Launcher
+   * Alt+click any control to cycle 1→6 (sessionStorage override for this tab).
+   */
+  var UI_VARIANT = 'all';
 
   /**
    * Block Notion SPA navigations (pushState/replaceState/popstate) away from
@@ -79,12 +97,22 @@
   /** sessionStorage keys — per-tab only (not localStorage). */
   var STORAGE_KEY_LOCKED = 'notionLockedLauncher.isLocked';
   var STORAGE_KEY_URL = 'notionLockedLauncher.lockedUrl';
+  var STORAGE_KEY_VARIANT = 'notionLockedLauncher.uiVariant';
 
   /** Marker attribute so we never intercept our own UI. */
   var UI_ROOT_ATTR = 'data-notion-locked-launcher';
 
   /** Toast display duration (ms). */
   var TOAST_MS = 2200;
+
+  var VARIANT_META = {
+    1: { id: 'rail', name: 'Hairline rail' },
+    2: { id: 'pin', name: 'Corner pin' },
+    3: { id: 'dot', name: 'Status dot' },
+    4: { id: 'topbar', name: 'Top bar' },
+    5: { id: 'lockedonly', name: 'Locked-only' },
+    6: { id: 'segment', name: 'Segmented' }
+  };
 
   // ---------------------------------------------------------------------------
   // Guard against double-injection
@@ -108,7 +136,7 @@
 
   // Always announce once so Zen/AdGuard injection can be verified in DevTools.
   try {
-    console.info('[Notion Locked Launcher] v1.2.3 active — peek or Cmd+Shift+L (no tab-title rewrite)');
+    console.info('[Notion Locked Launcher] v1.3.0 active — UI variants or Cmd+Shift+L (Alt+click cycles)');
   } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
@@ -226,8 +254,8 @@
   }
 
   function syncChromeUi() {
-    if (SHOW_PEEK_TOGGLE) updatePeekToggle();
-    else removePeekToggle();
+    if (SHOW_PEEK_TOGGLE) updateLauncherUi();
+    else removeLauncherUi();
   }
 
   /** One-time cleanup if an older build left a 🔒 title prefix. */
@@ -326,169 +354,602 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Peek toggle (right-edge sliver → expands on hover)
+  // Launcher UI variants (1–6, or 'all' for side-by-side test)
   // ---------------------------------------------------------------------------
 
-  var PEEK_ID = 'nll-peek-toggle';
+  var UI_ROOT_ID = 'nll-ui-root';
+  var STYLE_ID = 'nll-ui-style';
 
-  function ensurePeekStyles(doc) {
-    if (doc.getElementById('nll-peek-style')) return;
+  function svgPin(filled) {
+    // Simple thumbtack / map-pin silhouette
+    if (filled) {
+      return '<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">' +
+        '<path fill="currentColor" d="M8 1.5a3.2 3.2 0 0 0-1.1 6.2V13a1.1 1.1 0 0 0 2.2 0V7.7A3.2 3.2 0 0 0 8 1.5z"/>' +
+        '</svg>';
+    }
+    return '<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">' +
+      '<path fill="none" stroke="currentColor" stroke-width="1.4" ' +
+      'd="M8 2.2a2.6 2.6 0 0 0-.9 5V13a.9.9 0 0 0 1.8 0V7.2a2.6 2.6 0 0 0-.9-5z"/>' +
+      '</svg>';
+  }
+
+  function readUiVariantPref() {
+    try {
+      var raw = sessionStorage.getItem(STORAGE_KEY_VARIANT);
+      if (raw === 'all') return 'all';
+      var n = parseInt(raw, 10);
+      if (n >= 1 && n <= 6) return n;
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
+  function writeUiVariantPref(value) {
+    try {
+      sessionStorage.setItem(STORAGE_KEY_VARIANT, String(value));
+    } catch (e) { /* ignore */ }
+  }
+
+  /** Effective variant: session override → config. */
+  function getUiVariant() {
+    var pref = readUiVariantPref();
+    if (pref != null) return pref;
+    if (UI_VARIANT === 'all') return 'all';
+    var n = parseInt(UI_VARIANT, 10);
+    if (n >= 1 && n <= 6) return n;
+    return 'all';
+  }
+
+  function variantsToMount() {
+    var v = getUiVariant();
+    if (v === 'all') return [1, 2, 3, 4, 5, 6];
+    return [v];
+  }
+
+  function isAllMode() {
+    return getUiVariant() === 'all';
+  }
+
+  function cycleUiVariant() {
+    var current = getUiVariant();
+    var next;
+    if (current === 'all') next = 1;
+    else if (current >= 6) next = 'all';
+    else next = current + 1;
+    writeUiVariantPref(next);
+    var label = next === 'all' ? 'all six (test)' : (next + ' · ' + VARIANT_META[next].name);
+    showToast('UI variant: ' + label);
+    remountLauncherUi();
+  }
+
+  function ensureLauncherStyles(doc) {
+    var existing = doc.getElementById(STYLE_ID);
+    if (existing) {
+      try { existing.parentNode.removeChild(existing); } catch (e) { /* ignore */ }
+    }
     var style = doc.createElement('style');
-    style.id = 'nll-peek-style';
+    style.id = STYLE_ID;
     style.textContent =
-      '#' + PEEK_ID + '{' +
-        'position:fixed!important;top:68px!important;right:0!important;' +
-        'z-index:2147483647!important;box-sizing:border-box!important;' +
-        'display:inline-flex!important;align-items:center!important;' +
-        'gap:6px!important;height:26px!important;max-width:none!important;' +
-        'padding:0 10px 0 7px!important;margin:0!important;' +
-        'border:1px solid rgba(55,53,47,.18)!important;border-right:none!important;' +
-        'border-radius:999px 0 0 999px!important;' +
-        'background:rgba(255,255,255,.92)!important;color:#37352f!important;' +
-        'font:11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
-        'letter-spacing:.01em!important;white-space:nowrap!important;' +
-        'box-shadow:-2px 2px 10px rgba(15,15,15,.08)!important;' +
-        'backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;' +
-        'cursor:pointer!important;user-select:none!important;' +
-        'transform:translateX(calc(100% - 12px))!important;' +
-        'transition:transform .18s ease,background .15s ease,color .15s ease,border-color .15s ease!important;' +
-        'opacity:.72!important;pointer-events:auto!important;' +
+      /* Shared */
+      '#' + UI_ROOT_ID + '{' +
+        'position:fixed!important;inset:0!important;pointer-events:none!important;' +
+        'z-index:2147483647!important;' +
       '}' +
-      '#' + PEEK_ID + ':hover,#' + PEEK_ID + ':focus-visible,#' + PEEK_ID + '.nll-expanded{' +
+      '#' + UI_ROOT_ID + ' [data-nll-variant]{' +
+        'pointer-events:auto!important;box-sizing:border-box!important;' +
+        'font:11px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
+        'letter-spacing:.01em!important;cursor:pointer!important;user-select:none!important;' +
+        'margin:0!important;-webkit-appearance:none!important;appearance:none!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-tag{' +
+        'position:absolute!important;left:-18px!important;top:50%!important;' +
+        'transform:translateY(-50%)!important;' +
+        'width:14px!important;height:14px!important;border-radius:3px!important;' +
+        'background:rgba(15,15,15,.72)!important;color:#fff!important;' +
+        'font:10px/14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
+        'text-align:center!important;pointer-events:none!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-tag.nll-tag-top{' +
+        'left:auto!important;right:0!important;top:-16px!important;transform:none!important;' +
+      '}' +
+
+      /* 1 — Hairline rail */
+      '#' + UI_ROOT_ID + ' .nll-v-rail{' +
+        'position:absolute!important;top:72px!important;right:0!important;' +
+        'display:inline-flex!important;align-items:center!important;gap:8px!important;' +
+        'height:36px!important;padding:0 10px 0 0!important;' +
+        'border:none!important;background:transparent!important;color:#37352f!important;' +
+        'transform:translateX(calc(100% - 3px))!important;' +
+        'transition:transform .18s ease,opacity .15s ease!important;opacity:.55!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail::before{' +
+        'content:""!important;display:block!important;width:3px!important;height:100%!important;' +
+        'border-radius:2px 0 0 2px!important;background:rgba(55,53,47,.28)!important;' +
+        'flex:0 0 auto!important;transition:background .15s ease,width .15s ease!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail .nll-label{' +
+        'opacity:0!important;transform:translateX(6px)!important;' +
+        'transition:opacity .15s ease,transform .15s ease!important;white-space:nowrap!important;' +
+        'color:#37352f!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail:hover,#' + UI_ROOT_ID + ' .nll-v-rail:focus-visible,#' + UI_ROOT_ID + ' .nll-v-rail.nll-expanded{' +
         'transform:translateX(0)!important;opacity:1!important;outline:none!important;' +
       '}' +
-      '#' + PEEK_ID + '[aria-pressed="true"]{' +
-        'background:rgba(35,131,226,.16)!important;color:#0B6BCB!important;' +
-        'border-color:rgba(35,131,226,.35)!important;opacity:.95!important;' +
-        'transform:translateX(calc(100% - 16px))!important;' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail:hover .nll-label,#' + UI_ROOT_ID + ' .nll-v-rail:focus-visible .nll-label,#' + UI_ROOT_ID + ' .nll-v-rail.nll-expanded .nll-label{' +
+        'opacity:1!important;transform:translateX(0)!important;' +
       '}' +
-      '#' + PEEK_ID + '[aria-pressed="true"]:hover,#' + PEEK_ID + '[aria-pressed="true"]:focus-visible,#' + PEEK_ID + '[aria-pressed="true"].nll-expanded{' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"]{' +
+        'opacity:.9!important;transform:translateX(calc(100% - 4px))!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"]::before{' +
+        'width:4px!important;background:#2383e2!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"] .nll-label{color:#0B6BCB!important;}' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"].nll-expanded{' +
         'transform:translateX(0)!important;' +
       '}' +
-      '#' + PEEK_ID + ' .nll-peek-icon{' +
-        'flex:0 0 auto!important;width:12px!important;text-align:center!important;' +
-        'font-size:11px!important;line-height:1!important;' +
+
+      /* 2 — Corner pin */
+      '#' + UI_ROOT_ID + ' .nll-v-pin{' +
+        'position:absolute!important;top:120px!important;right:0!important;' +
+        'display:inline-flex!important;align-items:center!important;gap:6px!important;' +
+        'height:26px!important;padding:0 10px 0 8px!important;' +
+        'border:1px solid rgba(55,53,47,.16)!important;border-right:none!important;' +
+        'border-radius:6px 0 0 6px!important;' +
+        'background:rgba(255,255,255,.9)!important;color:#37352f!important;' +
+        'box-shadow:-1px 1px 6px rgba(15,15,15,.06)!important;' +
+        'transform:translateX(calc(100% - 22px))!important;' +
+        'transition:transform .18s ease,background .15s ease,color .15s ease,border-color .15s ease!important;' +
+        'opacity:.75!important;' +
       '}' +
-      '#' + PEEK_ID + ' .nll-peek-label{' +
-        'flex:0 1 auto!important;overflow:hidden!important;' +
-      '}';
+      '#' + UI_ROOT_ID + ' .nll-v-pin .nll-icon{' +
+        'display:inline-flex!important;width:12px!important;height:12px!important;' +
+        'align-items:center!important;justify-content:center!important;flex:0 0 auto!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-pin .nll-label{white-space:nowrap!important;}' +
+      '#' + UI_ROOT_ID + ' .nll-v-pin:hover,#' + UI_ROOT_ID + ' .nll-v-pin:focus-visible,#' + UI_ROOT_ID + ' .nll-v-pin.nll-expanded{' +
+        'transform:translateX(0)!important;opacity:1!important;outline:none!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"]{' +
+        'background:rgba(35,131,226,.12)!important;color:#0B6BCB!important;' +
+        'border-color:rgba(35,131,226,.32)!important;opacity:.95!important;' +
+        'transform:translateX(calc(100% - 24px))!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"].nll-expanded{' +
+        'transform:translateX(0)!important;' +
+      '}' +
+
+      /* 3 — Status dot */
+      '#' + UI_ROOT_ID + ' .nll-v-dot{' +
+        'position:absolute!important;top:168px!important;right:0!important;' +
+        'display:inline-flex!important;align-items:center!important;gap:8px!important;' +
+        'height:22px!important;padding:0 10px 0 6px!important;' +
+        'border:none!important;background:transparent!important;color:#37352f!important;' +
+        'transform:translateX(calc(100% - 14px))!important;' +
+        'transition:transform .18s ease,opacity .15s ease!important;opacity:.65!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-dot .nll-dot{' +
+        'width:8px!important;height:8px!important;border-radius:50%!important;' +
+        'background:rgba(55,53,47,.35)!important;flex:0 0 auto!important;' +
+        'box-shadow:0 0 0 2px rgba(255,255,255,.65)!important;' +
+        'transition:background .15s ease!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-dot .nll-label{' +
+        'opacity:0!important;white-space:nowrap!important;' +
+        'transition:opacity .15s ease!important;color:rgba(55,53,47,.85)!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-dot:hover,#' + UI_ROOT_ID + ' .nll-v-dot:focus-visible,#' + UI_ROOT_ID + ' .nll-v-dot.nll-expanded{' +
+        'transform:translateX(0)!important;opacity:1!important;outline:none!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-dot:hover .nll-label,#' + UI_ROOT_ID + ' .nll-v-dot:focus-visible .nll-label,#' + UI_ROOT_ID + ' .nll-v-dot.nll-expanded .nll-label{' +
+        'opacity:1!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"] .nll-dot{background:#2383e2!important;}' +
+      '#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"]{' +
+        'opacity:.9!important;transform:translateX(calc(100% - 14px))!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"].nll-expanded{' +
+        'transform:translateX(0)!important;' +
+      '}' +
+
+      /* 4 — Notion-native top bar */
+      '#' + UI_ROOT_ID + ' .nll-v-topbar{' +
+        'position:absolute!important;top:10px!important;right:210px!important;' +
+        'display:inline-flex!important;align-items:center!important;gap:0!important;' +
+        'height:28px!important;padding:0 8px!important;' +
+        'border:none!important;border-radius:6px!important;' +
+        'background:transparent!important;color:rgba(55,53,47,.65)!important;' +
+        'font:13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
+        'transition:background .12s ease,color .12s ease!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-topbar:hover,#' + UI_ROOT_ID + ' .nll-v-topbar:focus-visible{' +
+        'background:rgba(55,53,47,.08)!important;color:#37352f!important;outline:none!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-topbar[aria-pressed="true"]{' +
+        'color:#0B6BCB!important;background:rgba(35,131,226,.1)!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-topbar[aria-pressed="true"]:hover{' +
+        'background:rgba(35,131,226,.16)!important;' +
+      '}' +
+
+      /* 5 — Locked-only (placeholder when unlocked in test mode) */
+      '#' + UI_ROOT_ID + ' .nll-v-lockedonly{' +
+        'position:absolute!important;top:0!important;left:0!important;right:0!important;' +
+        'height:2px!important;padding:0!important;border:none!important;border-radius:0!important;' +
+        'background:transparent!important;color:transparent!important;' +
+        'transition:background .15s ease,height .15s ease!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-lockedonly .nll-lockedonly-chip{' +
+        'display:none!important;' +
+      '}' +
+      /* Single-variant locked: top-edge “Launcher” chip */
+      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-lockedonly[aria-pressed="true"]{' +
+        'height:auto!important;top:0!important;left:auto!important;right:12px!important;' +
+        'width:auto!important;padding:4px 10px!important;' +
+        'border-radius:0 0 6px 6px!important;' +
+        'background:rgba(35,131,226,.92)!important;color:#fff!important;' +
+        'box-shadow:0 2px 8px rgba(15,15,15,.12)!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-lockedonly[aria-pressed="true"] .nll-lockedonly-chip{' +
+        'display:inline!important;font:11px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
+        'letter-spacing:.02em!important;white-space:nowrap!important;' +
+      '}' +
+      /* All-mode: keep #5 in the stack (right edge) so it doesn’t cover other variants */
+      '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly{' +
+        'top:216px!important;left:auto!important;right:0!important;height:26px!important;' +
+        'padding:0 10px!important;width:auto!important;' +
+        'border:1px dashed rgba(55,53,47,.28)!important;border-right:none!important;' +
+        'border-radius:6px 0 0 6px!important;background:rgba(255,255,255,.5)!important;' +
+        'color:rgba(55,53,47,.45)!important;transform:translateX(calc(100% - 18px))!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly .nll-lockedonly-chip{' +
+        'display:inline!important;white-space:nowrap!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly:hover{' +
+        'transform:translateX(0)!important;color:rgba(55,53,47,.7)!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly[aria-pressed="true"]{' +
+        'border-style:solid!important;border-color:rgba(35,131,226,.35)!important;' +
+        'background:rgba(35,131,226,.92)!important;color:#fff!important;' +
+        'opacity:.95!important;transform:translateX(calc(100% - 22px))!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly[aria-pressed="true"]:hover{' +
+        'transform:translateX(0)!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-lockedonly.nll-hidden-unlocked{' +
+        'display:none!important;' +
+      '}' +
+
+      /* 6 — Segmented Free | Launcher */
+      '#' + UI_ROOT_ID + ' .nll-v-segment{' +
+        'position:absolute!important;top:260px!important;right:8px!important;' +
+        'display:inline-flex!important;align-items:stretch!important;padding:2px!important;' +
+        'gap:0!important;height:26px!important;' +
+        'border:1px solid rgba(55,53,47,.16)!important;border-radius:8px!important;' +
+        'background:rgba(255,255,255,.92)!important;' +
+        'box-shadow:0 1px 4px rgba(15,15,15,.06)!important;' +
+        'opacity:.85!important;transition:opacity .15s ease!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-segment:hover{opacity:1!important;}' +
+      '#' + UI_ROOT_ID + ' .nll-v-segment .nll-seg{' +
+        'display:inline-flex!important;align-items:center!important;justify-content:center!important;' +
+        'padding:0 8px!important;border:none!important;border-radius:6px!important;' +
+        'background:transparent!important;color:rgba(55,53,47,.55)!important;' +
+        'font:11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
+        'cursor:pointer!important;white-space:nowrap!important;' +
+        'transition:background .12s ease,color .12s ease!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-segment .nll-seg[aria-pressed="true"]{' +
+        'background:rgba(35,131,226,.14)!important;color:#0B6BCB!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-segment .nll-seg:focus-visible{outline:2px solid rgba(35,131,226,.45)!important;outline-offset:1px!important;}' +
+
+      /* Stack offsets when showing a single non-all variant — reset awkward tops */
+      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-rail,' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-pin,' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-dot{' +
+        'top:72px!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-segment{' +
+        'top:72px!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-tag{display:none!important;}';
+
     (doc.head || doc.documentElement).appendChild(style);
   }
 
-  function removePeekToggle() {
-    var btn = document.getElementById(PEEK_ID);
-    if (btn && btn.parentNode) {
-      try { btn.parentNode.removeChild(btn); } catch (e) { /* ignore */ }
+  function stopNotion(e) {
+    e.stopPropagation();
+  }
+
+  function bindExpandOnHover(el) {
+    el.addEventListener('mouseenter', function () { el.classList.add('nll-expanded'); });
+    el.addEventListener('mouseleave', function () { el.classList.remove('nll-expanded'); });
+    el.addEventListener('focus', function () { el.classList.add('nll-expanded'); });
+    el.addEventListener('blur', function () { el.classList.remove('nll-expanded'); });
+  }
+
+  function bindToggleClick(el) {
+    el.addEventListener('mousedown', stopNotion, true);
+    el.addEventListener('mouseup', stopNotion, true);
+    el.addEventListener('pointerdown', stopNotion, true);
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      if (e.altKey) {
+        cycleUiVariant();
+        return;
+      }
+      toggleLock();
+    }, true);
+  }
+
+  function makeTag(doc, num, top) {
+    var tag = doc.createElement('span');
+    tag.className = 'nll-tag' + (top ? ' nll-tag-top' : '');
+    tag.setAttribute('aria-hidden', 'true');
+    tag.textContent = String(num);
+    return tag;
+  }
+
+  function createVariantControl(doc, num) {
+    var meta = VARIANT_META[num];
+    var el;
+    var showTags = isAllMode();
+
+    if (num === 1) {
+      el = doc.createElement('button');
+      el.type = 'button';
+      el.className = 'nll-v-rail';
+      var label1 = doc.createElement('span');
+      label1.className = 'nll-label';
+      el.appendChild(label1);
+      bindExpandOnHover(el);
+      bindToggleClick(el);
+    } else if (num === 2) {
+      el = doc.createElement('button');
+      el.type = 'button';
+      el.className = 'nll-v-pin';
+      var icon2 = doc.createElement('span');
+      icon2.className = 'nll-icon';
+      icon2.setAttribute('aria-hidden', 'true');
+      var label2 = doc.createElement('span');
+      label2.className = 'nll-label';
+      el.appendChild(icon2);
+      el.appendChild(label2);
+      bindExpandOnHover(el);
+      bindToggleClick(el);
+    } else if (num === 3) {
+      el = doc.createElement('button');
+      el.type = 'button';
+      el.className = 'nll-v-dot';
+      var dot = doc.createElement('span');
+      dot.className = 'nll-dot';
+      dot.setAttribute('aria-hidden', 'true');
+      var label3 = doc.createElement('span');
+      label3.className = 'nll-label';
+      el.appendChild(dot);
+      el.appendChild(label3);
+      bindExpandOnHover(el);
+      bindToggleClick(el);
+    } else if (num === 4) {
+      el = doc.createElement('button');
+      el.type = 'button';
+      el.className = 'nll-v-topbar';
+      var label4 = doc.createElement('span');
+      label4.className = 'nll-label';
+      el.appendChild(label4);
+      bindToggleClick(el);
+    } else if (num === 5) {
+      el = doc.createElement('button');
+      el.type = 'button';
+      el.className = 'nll-v-lockedonly';
+      var chip = doc.createElement('span');
+      chip.className = 'nll-lockedonly-chip';
+      el.appendChild(chip);
+      bindToggleClick(el);
+    } else if (num === 6) {
+      el = doc.createElement('div');
+      el.className = 'nll-v-segment';
+      el.setAttribute('role', 'group');
+      var freeBtn = doc.createElement('button');
+      freeBtn.type = 'button';
+      freeBtn.className = 'nll-seg nll-seg-free';
+      freeBtn.textContent = 'Free';
+      var launchBtn = doc.createElement('button');
+      launchBtn.type = 'button';
+      launchBtn.className = 'nll-seg nll-seg-launch';
+      launchBtn.textContent = 'Launcher';
+      function onSeg(e, wantLocked) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+        if (e.altKey) {
+          cycleUiVariant();
+          return;
+        }
+        var locked = readIsLocked();
+        if (wantLocked && !locked) enableLock();
+        else if (!wantLocked && locked) disableLock();
+      }
+      freeBtn.addEventListener('mousedown', stopNotion, true);
+      launchBtn.addEventListener('mousedown', stopNotion, true);
+      freeBtn.addEventListener('click', function (e) { onSeg(e, false); }, true);
+      launchBtn.addEventListener('click', function (e) { onSeg(e, true); }, true);
+      el.addEventListener('mousedown', stopNotion, true);
+      el.appendChild(freeBtn);
+      el.appendChild(launchBtn);
+    } else {
+      return null;
+    }
+
+    el.setAttribute(UI_ROOT_ATTR, 'variant-' + meta.id);
+    el.setAttribute('data-nll-variant', String(num));
+    el.setAttribute('aria-label', meta.name + ' — toggle locked launcher (Alt+click to cycle variants)');
+    el.title = meta.name + ' — click to toggle · Alt+click to cycle variants · Cmd+Shift+L';
+
+    if (showTags) {
+      // Top-bar sits in the header; tag above it. Others get a side index.
+      el.appendChild(makeTag(doc, num, num === 4));
+    }
+
+    return el;
+  }
+
+  function updateVariantControl(el, locked) {
+    if (!el) return;
+    var num = parseInt(el.getAttribute('data-nll-variant'), 10);
+    var titleBase = (VARIANT_META[num] ? VARIANT_META[num].name : 'Launcher') +
+      ' — click to toggle · Alt+click to cycle · Cmd+Shift+L';
+
+    if (num === 1) {
+      el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      var l1 = el.querySelector('.nll-label');
+      if (l1) l1.textContent = locked ? 'Unlock' : 'Lock';
+      el.title = titleBase;
+    } else if (num === 2) {
+      el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      var icon = el.querySelector('.nll-icon');
+      var l2 = el.querySelector('.nll-label');
+      if (icon) icon.innerHTML = svgPin(locked);
+      if (l2) l2.textContent = locked ? 'Pinned' : 'Pin';
+      el.title = titleBase;
+    } else if (num === 3) {
+      el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      var l3 = el.querySelector('.nll-label');
+      if (l3) l3.textContent = locked ? 'Launcher · ⌘⇧L' : 'Launcher · ⌘⇧L';
+      el.title = titleBase;
+    } else if (num === 4) {
+      el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      var l4 = el.querySelector('.nll-label');
+      if (l4) l4.textContent = locked ? 'Locked' : 'Lock tab';
+      el.title = titleBase;
+    } else if (num === 5) {
+      el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      var chip = el.querySelector('.nll-lockedonly-chip');
+      el.classList.remove('nll-hidden-unlocked');
+      if (locked) {
+        if (chip) chip.textContent = 'Launcher';
+      } else if (isAllMode()) {
+        if (chip) chip.textContent = 'hidden until locked';
+      } else {
+        el.classList.add('nll-hidden-unlocked');
+        if (chip) chip.textContent = '';
+      }
+      el.title = titleBase;
+    } else if (num === 6) {
+      var freeBtn = el.querySelector('.nll-seg-free');
+      var launchBtn = el.querySelector('.nll-seg-launch');
+      if (freeBtn) freeBtn.setAttribute('aria-pressed', locked ? 'false' : 'true');
+      if (launchBtn) launchBtn.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      el.title = titleBase;
     }
   }
 
-  function updatePeekToggle() {
+  function removeLauncherUi() {
+    var root = document.getElementById(UI_ROOT_ID);
+    if (root && root.parentNode) {
+      try { root.parentNode.removeChild(root); } catch (e) { /* ignore */ }
+    }
+    // Legacy single peek cleanup
+    var legacy = document.getElementById('nll-peek-toggle');
+    if (legacy && legacy.parentNode) {
+      try { legacy.parentNode.removeChild(legacy); } catch (e2) { /* ignore */ }
+    }
+  }
+
+  function remountLauncherUi() {
+    removeLauncherUi();
+    mountLauncherUi();
+  }
+
+  function updateLauncherUi() {
     if (!SHOW_PEEK_TOGGLE) {
-      removePeekToggle();
+      removeLauncherUi();
       return;
     }
-    var btn = document.getElementById(PEEK_ID);
-    if (!btn) return;
+    var root = document.getElementById(UI_ROOT_ID);
+    if (!root) {
+      mountLauncherUi();
+      return;
+    }
     var locked = readIsLocked();
-    var icon = btn.querySelector('.nll-peek-icon');
-    var label = btn.querySelector('.nll-peek-label');
-    if (icon) icon.textContent = locked ? '🔒' : '🔓';
-    if (label) label.textContent = locked ? 'Locked' : 'Lock';
-    btn.setAttribute('aria-pressed', locked ? 'true' : 'false');
-    btn.title = locked
-      ? 'Unlock launcher (Cmd+Shift+L)'
-      : 'Lock this tab as launcher (Cmd+Shift+L)';
+    var nodes = root.querySelectorAll('[data-nll-variant]');
+    for (var i = 0; i < nodes.length; i++) updateVariantControl(nodes[i], locked);
   }
 
-  function mountPeekToggle() {
+  function mountLauncherUi() {
     if (!SHOW_PEEK_TOGGLE) {
-      removePeekToggle();
+      removeLauncherUi();
       return;
     }
     var doc = document;
     if (!doc.documentElement) return;
-    ensurePeekStyles(doc);
-
-    var existing = doc.getElementById(PEEK_ID);
-    if (existing) {
-      if (existing.parentNode !== doc.documentElement &&
-          existing.parentNode !== doc.body) {
-        (doc.documentElement || doc.body).appendChild(existing);
-      }
-      updatePeekToggle();
-      return;
-    }
+    ensureLauncherStyles(doc);
 
     var parent = doc.documentElement || doc.body;
     if (!parent) return;
 
-    var btn = doc.createElement('button');
-    btn.type = 'button';
-    btn.id = PEEK_ID;
-    btn.setAttribute(UI_ROOT_ATTR, 'peek');
-    btn.setAttribute('aria-label', 'Toggle Notion locked launcher for this tab');
-
-    var icon = doc.createElement('span');
-    icon.className = 'nll-peek-icon';
-    icon.setAttribute('aria-hidden', 'true');
-    var label = doc.createElement('span');
-    label.className = 'nll-peek-label';
-    btn.appendChild(icon);
-    btn.appendChild(label);
-
-    function stopNotion(e) {
-      e.stopPropagation();
+    var root = doc.getElementById(UI_ROOT_ID);
+    if (!root) {
+      root = doc.createElement('div');
+      root.id = UI_ROOT_ID;
+      root.setAttribute(UI_ROOT_ATTR, 'root');
+      parent.appendChild(root);
+    } else if (root.parentNode !== parent) {
+      parent.appendChild(root);
     }
-    btn.addEventListener('mousedown', stopNotion, true);
-    btn.addEventListener('mouseup', stopNotion, true);
-    btn.addEventListener('pointerdown', stopNotion, true);
-    btn.addEventListener('mouseenter', function () {
-      btn.classList.add('nll-expanded');
-    });
-    btn.addEventListener('mouseleave', function () {
-      btn.classList.remove('nll-expanded');
-    });
-    btn.addEventListener('focus', function () {
-      btn.classList.add('nll-expanded');
-    });
-    btn.addEventListener('blur', function () {
-      btn.classList.remove('nll-expanded');
-    });
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
-      toggleLock();
-    }, true);
 
-    parent.appendChild(btn);
-    updatePeekToggle();
-    log('Peek toggle mounted');
+    var want = variantsToMount();
+    root.setAttribute('data-nll-mode', want.length > 1 ? 'all' : 'single');
+
+    // Remove controls that shouldn't be mounted
+    var existing = root.querySelectorAll('[data-nll-variant]');
+    var wantSet = {};
+    for (var w = 0; w < want.length; w++) wantSet[want[w]] = true;
+    for (var i = 0; i < existing.length; i++) {
+      var n = parseInt(existing[i].getAttribute('data-nll-variant'), 10);
+      if (!wantSet[n]) {
+        try { existing[i].parentNode.removeChild(existing[i]); } catch (e) { /* ignore */ }
+      }
+    }
+
+    var locked = readIsLocked();
+    for (var j = 0; j < want.length; j++) {
+      var num = want[j];
+      var el = root.querySelector('[data-nll-variant="' + num + '"]');
+      if (!el) {
+        el = createVariantControl(doc, num);
+        if (el) root.appendChild(el);
+      }
+      updateVariantControl(el, locked);
+    }
+    log('Launcher UI mounted; variants=', want.join(','));
   }
 
-  function watchPeekToggleSurvival() {
+  function watchLauncherUiSurvival() {
     if (!SHOW_PEEK_TOGGLE) return;
 
     var started = false;
     var obs = new MutationObserver(function () {
-      if (!document.getElementById(PEEK_ID)) mountPeekToggle();
+      if (!document.getElementById(UI_ROOT_ID)) mountLauncherUi();
     });
 
     function start() {
       if (started) {
-        mountPeekToggle();
+        mountLauncherUi();
         return;
       }
       var root = document.documentElement || document.body;
       if (!root) return;
       started = true;
-      mountPeekToggle();
+      mountLauncherUi();
       try {
         obs.observe(root, { childList: true, subtree: true });
       } catch (e) { /* ignore */ }
       try {
         setInterval(function () {
-          if (!document.getElementById(PEEK_ID)) mountPeekToggle();
+          if (!document.getElementById(UI_ROOT_ID)) mountLauncherUi();
         }, 2000);
       } catch (e2) { /* ignore */ }
     }
@@ -723,7 +1184,7 @@
   // ---------------------------------------------------------------------------
 
   clearLegacyTitleLockPrefix();
-  watchPeekToggleSurvival();
+  watchLauncherUiSurvival();
   syncChromeUi();
-  log('Initialized; locked=', readIsLocked(), 'url=', readLockedUrl());
+  log('Initialized; locked=', readIsLocked(), 'url=', readLockedUrl(), 'ui=', getUiVariant());
 })();
