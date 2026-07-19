@@ -39,20 +39,22 @@ Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to
 
 1. Paste [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) into AdGuard → **Extensions** → **+**
 2. Open Notion → go to your launcher page (e.g. Tasks database)
-3. Lock with a UI control or **Cmd+Shift+L**
+3. Lock with **Cmd+Shift+L** — a thin **blue rail** appears on the right edge while locked
 4. While locked, links open in a **new** tab; this tab stays on the saved URL
-5. Unlock from the control or the same shortcut (state is per-tab via `sessionStorage`)
+5. Unlock with the same shortcut, or hover/click the blue rail (state is per-tab via `sessionStorage`)
 
-**UI variants (v1.3.1):** default is **`4`** (centered top-bar control — middle of Notion’s header, clear of Zen’s right sidebar). Set `UI_VARIANT` to `'all'` to stack all six again, or `1`–`6` for one. **Alt+click** cycles variants (session override for the tab).
+**UI (v1.3.2):** default is **`indicator`** — keyboard-first; no chrome when unlocked; blue hairline rail when locked (like variant 1, but status-only). Other designs remain for comparison via `UI_VARIANT` or **Alt+click**.
 
-| # | Variant | Idea |
-|---|---------|------|
-| 1 | Hairline rail | Thin right-edge color strip; label on hover |
-| 2 | Corner pin | Pin icon + Pin / Pinned |
-| 3 | Status dot | Tiny dot; hover shows `Launcher · ⌘⇧L` |
-| 4 | Top bar | Quiet Notion-like text, **centered** in the top bar |
-| 5 | Locked-only | Hidden when unlocked; “Launcher” chip when locked |
-| 6 | Segmented | `Free` \| `Launcher` two-state control |
+| Value | Variant | Idea |
+|-------|---------|------|
+| `indicator` | Locked rail | **Default.** Hidden until locked; blue right-edge bar |
+| `1` | Hairline rail | Thin right-edge strip; always present; label on hover |
+| `2` | Corner pin | Pin icon + Pin / Pinned |
+| `3` | Status dot | Tiny dot; hover shows `Launcher · ⌘⇧L` |
+| `4` | Top bar | Quiet Notion-like text, centered in the top bar |
+| `5` | Locked-only | Hidden when unlocked; “Launcher” chip when locked |
+| `6` | Segmented | `Free` \| `Launcher` two-state control |
+| `all` | All of 1–6 | Stacked A/B comparison |
 
 While locked, the script:
 
@@ -63,7 +65,7 @@ While locked, the script:
 Optional config near the top of the script:
 
 - `SHOW_PEEK_TOGGLE` (default `true`) — show launcher UI (any variant)
-- `UI_VARIANT` (default `4`) — `'all'` or `1`–`6` (see table above)
+- `UI_VARIANT` (default `'indicator'`) — `'indicator'`, `'all'`, or `1`–`6` (see table above)
 - `GUARD_SPA_NAVIGATION` (default `true`)
 - `INTERCEPT_EXTERNAL_LINKS` (default `false`)
 - `DEBUG` (default `false`)
@@ -79,8 +81,8 @@ Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inj
 3. In AdGuard → **Extensions**, confirm Notion Locked Launcher is **enabled**
 4. Fully **close all Notion tabs**, open a fresh one
 5. Open DevTools → Console and look for: `[Notion Locked Launcher] active`
-6. Click a UI control or press **Cmd+Shift+L** — you should get a toast when locked  
-   Console should show: `[Notion Locked Launcher] v1.3.1 active` (if you still see an older line, AdGuard is running a stale paste)
+6. Press **Cmd+Shift+L** — toast + blue right-edge rail when locked  
+   Console should show: `[Notion Locked Launcher] v1.3.2 active` (if you still see an older line, AdGuard is running a stale paste)
 
 If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering).
 

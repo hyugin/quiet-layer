@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.3.1
+// @version      1.3.2
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -37,14 +37,9 @@
  * Usage
  * -----
  * 1. Open Notion → go to your launcher page (e.g. Tasks database).
- * 2. Lock via a UI control (see UI_VARIANT) or Cmd+Shift+L.
+ * 2. Lock with Cmd+Shift+L (primary). A thin blue right-edge rail appears
+ *    while locked; click it to unlock. (See UI_VARIANT for other designs.)
  * 3. Sidebar / page / relation links open in a NEW tab; this tab stays put.
- *
- * UI variants (test mode)
- * ----------------------
- * UI_VARIANT = 'all' mounts all six designs stacked for comparison.
- * Set to 1–6 to keep one. Alt+click any control cycles the active variant
- * (persisted in sessionStorage for this tab).
  *
  * - State is per-tab via sessionStorage (not shared across tabs).
  * - Click capture handles <a href> navigations.
@@ -73,18 +68,18 @@
   var SHOW_PEEK_TOGGLE = true;
 
   /**
-   * Which lock control to show:
-   *   'all' — mount all six variants stacked (A/B test; prune later)
-   *   1 — Hairline rail
+   * Which lock UI to show:
+   *   'indicator' — (default) nothing when unlocked; blue hairline rail when locked
+   *   'all' — mount variants 1–6 stacked (A/B test)
+   *   1 — Hairline rail (always visible)
    *   2 — Corner pin
    *   3 — Status dot + keyboard hint
-   *   4 — Notion-native top bar
-   *   5 — Locked-only indicator
+   *   4 — Notion-native top bar (centered)
+   *   5 — Locked-only “Launcher” chip
    *   6 — Segmented Free | Launcher
-   * Alt+click any control to cycle 1→6 (sessionStorage override for this tab).
-   * Default 4 (centered top-bar) — set 'all' to compare again.
+   * Alt+click a control to cycle (sessionStorage override for this tab).
    */
-  var UI_VARIANT = 4;
+  var UI_VARIANT = 'indicator';
 
   /**
    * Block Notion SPA navigations (pushState/replaceState/popstate) away from
@@ -98,7 +93,8 @@
   /** sessionStorage keys — per-tab only (not localStorage). */
   var STORAGE_KEY_LOCKED = 'notionLockedLauncher.isLocked';
   var STORAGE_KEY_URL = 'notionLockedLauncher.lockedUrl';
-  var STORAGE_KEY_VARIANT = 'notionLockedLauncher.uiVariant';
+  /** Bumped key so older A/B session overrides don’t stick after the default change. */
+  var STORAGE_KEY_VARIANT = 'notionLockedLauncher.uiVariant.v2';
 
   /** Marker attribute so we never intercept our own UI. */
   var UI_ROOT_ATTR = 'data-notion-locked-launcher';
@@ -107,6 +103,7 @@
   var TOAST_MS = 2200;
 
   var VARIANT_META = {
+    indicator: { id: 'indicator', name: 'Locked rail' },
     1: { id: 'rail', name: 'Hairline rail' },
     2: { id: 'pin', name: 'Corner pin' },
     3: { id: 'dot', name: 'Status dot' },
@@ -114,6 +111,8 @@
     5: { id: 'lockedonly', name: 'Locked-only' },
     6: { id: 'segment', name: 'Segmented' }
   };
+
+  var VARIANT_CYCLE = ['indicator', 1, 2, 3, 4, 5, 6, 'all'];
 
   // ---------------------------------------------------------------------------
   // Guard against double-injection
@@ -137,7 +136,7 @@
 
   // Always announce once so Zen/AdGuard injection can be verified in DevTools.
   try {
-    console.info('[Notion Locked Launcher] v1.3.1 active — UI variants or Cmd+Shift+L (Alt+click cycles)');
+    console.info('[Notion Locked Launcher] v1.3.2 active — Cmd+Shift+L; blue rail when locked');
   } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
@@ -374,14 +373,19 @@
       '</svg>';
   }
 
+  function parseVariantToken(raw) {
+    if (raw === 'all' || raw === 'indicator') return raw;
+    var n = parseInt(raw, 10);
+    if (n >= 1 && n <= 6) return n;
+    return null;
+  }
+
   function readUiVariantPref() {
     try {
-      var raw = sessionStorage.getItem(STORAGE_KEY_VARIANT);
-      if (raw === 'all') return 'all';
-      var n = parseInt(raw, 10);
-      if (n >= 1 && n <= 6) return n;
-    } catch (e) { /* ignore */ }
-    return null;
+      return parseVariantToken(sessionStorage.getItem(STORAGE_KEY_VARIANT));
+    } catch (e) {
+      return null;
+    }
   }
 
   function writeUiVariantPref(value) {
@@ -394,10 +398,9 @@
   function getUiVariant() {
     var pref = readUiVariantPref();
     if (pref != null) return pref;
-    if (UI_VARIANT === 'all') return 'all';
-    var n = parseInt(UI_VARIANT, 10);
-    if (n >= 1 && n <= 6) return n;
-    return 'all';
+    var fromConfig = parseVariantToken(UI_VARIANT);
+    if (fromConfig != null) return fromConfig;
+    return 'indicator';
   }
 
   function variantsToMount() {
@@ -410,15 +413,21 @@
     return getUiVariant() === 'all';
   }
 
+  function variantLabel(v) {
+    if (v === 'all') return 'all six (test)';
+    if (VARIANT_META[v]) return String(v) + ' · ' + VARIANT_META[v].name;
+    return String(v);
+  }
+
   function cycleUiVariant() {
     var current = getUiVariant();
-    var next;
-    if (current === 'all') next = 1;
-    else if (current >= 6) next = 'all';
-    else next = current + 1;
+    var idx = -1;
+    for (var i = 0; i < VARIANT_CYCLE.length; i++) {
+      if (VARIANT_CYCLE[i] === current) { idx = i; break; }
+    }
+    var next = VARIANT_CYCLE[(idx + 1) % VARIANT_CYCLE.length];
     writeUiVariantPref(next);
-    var label = next === 'all' ? 'all six (test)' : (next + ' · ' + VARIANT_META[next].name);
-    showToast('UI variant: ' + label);
+    showToast('UI variant: ' + variantLabel(next));
     remountLauncherUi();
   }
 
@@ -451,6 +460,40 @@
       '}' +
       '#' + UI_ROOT_ID + ' .nll-tag.nll-tag-top{' +
         'left:auto!important;right:0!important;top:-16px!important;transform:none!important;' +
+      '}' +
+
+      /* indicator — locked-only blue hairline (keyboard-first default) */
+      '#' + UI_ROOT_ID + ' .nll-v-indicator{' +
+        'position:absolute!important;top:50%!important;right:0!important;' +
+        'display:none!important;align-items:center!important;gap:8px!important;' +
+        'height:72px!important;padding:0 10px 0 0!important;' +
+        'border:none!important;background:transparent!important;color:#0B6BCB!important;' +
+        'transform:translate(calc(100% - 3px),-50%)!important;' +
+        'transition:transform .18s ease,opacity .15s ease!important;' +
+        'opacity:0!important;pointer-events:none!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-indicator::before{' +
+        'content:""!important;display:block!important;width:3px!important;height:100%!important;' +
+        'border-radius:2px 0 0 2px!important;background:#2383e2!important;' +
+        'flex:0 0 auto!important;box-shadow:-1px 0 6px rgba(35,131,226,.35)!important;' +
+        'transition:width .15s ease!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-indicator .nll-label{' +
+        'opacity:0!important;white-space:nowrap!important;' +
+        'transition:opacity .15s ease!important;' +
+        'color:#0B6BCB!important;font-weight:500!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]{' +
+        'display:inline-flex!important;opacity:.95!important;pointer-events:auto!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"].nll-expanded{' +
+        'transform:translate(0,-50%)!important;opacity:1!important;outline:none!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:hover::before,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:focus-visible::before,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"].nll-expanded::before{' +
+        'width:4px!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:hover .nll-label,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:focus-visible .nll-label,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"].nll-expanded .nll-label{' +
+        'opacity:1!important;' +
       '}' +
 
       /* 1 — Hairline rail */
@@ -700,10 +743,21 @@
 
   function createVariantControl(doc, num) {
     var meta = VARIANT_META[num];
+    if (!meta) return null;
     var el;
     var showTags = isAllMode();
 
-    if (num === 1) {
+    if (num === 'indicator') {
+      el = doc.createElement('button');
+      el.type = 'button';
+      el.className = 'nll-v-indicator';
+      var labelInd = doc.createElement('span');
+      labelInd.className = 'nll-label';
+      labelInd.textContent = 'Unlock · ⌘⇧L';
+      el.appendChild(labelInd);
+      bindExpandOnHover(el);
+      bindToggleClick(el);
+    } else if (num === 1) {
       el = doc.createElement('button');
       el.type = 'button';
       el.className = 'nll-v-rail';
@@ -792,7 +846,9 @@
     el.setAttribute(UI_ROOT_ATTR, 'variant-' + meta.id);
     el.setAttribute('data-nll-variant', String(num));
     el.setAttribute('aria-label', meta.name + ' — toggle locked launcher (Alt+click to cycle variants)');
-    el.title = meta.name + ' — click to toggle · Alt+click to cycle variants · Cmd+Shift+L';
+    el.title = num === 'indicator'
+      ? 'Launcher locked — click to unlock · Cmd+Shift+L'
+      : meta.name + ' — click to toggle · Alt+click to cycle variants · Cmd+Shift+L';
 
     if (showTags) {
       // Top-bar sits in the header; tag above it. Others get a side index.
@@ -802,13 +858,25 @@
     return el;
   }
 
+  function variantKeyFromEl(el) {
+    var raw = el.getAttribute('data-nll-variant');
+    return parseVariantToken(raw);
+  }
+
   function updateVariantControl(el, locked) {
     if (!el) return;
-    var num = parseInt(el.getAttribute('data-nll-variant'), 10);
+    var num = variantKeyFromEl(el);
     var titleBase = (VARIANT_META[num] ? VARIANT_META[num].name : 'Launcher') +
       ' — click to toggle · Alt+click to cycle · Cmd+Shift+L';
 
-    if (num === 1) {
+    if (num === 'indicator') {
+      el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      el.title = locked
+        ? 'Launcher locked — click to unlock · Cmd+Shift+L'
+        : 'Lock with Cmd+Shift+L';
+      var li = el.querySelector('.nll-label');
+      if (li) li.textContent = 'Unlock · ⌘⇧L';
+    } else if (num === 1) {
       el.setAttribute('aria-pressed', locked ? 'true' : 'false');
       var l1 = el.querySelector('.nll-label');
       if (l1) l1.textContent = locked ? 'Unlock' : 'Lock';
@@ -912,10 +980,10 @@
     // Remove controls that shouldn't be mounted
     var existing = root.querySelectorAll('[data-nll-variant]');
     var wantSet = {};
-    for (var w = 0; w < want.length; w++) wantSet[want[w]] = true;
+    for (var w = 0; w < want.length; w++) wantSet[String(want[w])] = true;
     for (var i = 0; i < existing.length; i++) {
-      var n = parseInt(existing[i].getAttribute('data-nll-variant'), 10);
-      if (!wantSet[n]) {
+      var key = existing[i].getAttribute('data-nll-variant');
+      if (!wantSet[key]) {
         try { existing[i].parentNode.removeChild(existing[i]); } catch (e) { /* ignore */ }
       }
     }
