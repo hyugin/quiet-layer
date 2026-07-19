@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Open In New Tab (Allowlist)
+// @name         Stay Put
 // @namespace    https://github.com/hyugin/quiet-layer
 // @version      1.0.0
 // @description  On allowlisted apps, same-origin in-app links open in a new tab so the current tab stays put. Lighter than Notion Locked Launcher (no lock state).
@@ -108,20 +108,20 @@
   // Guard against double-injection
   // ---------------------------------------------------------------------------
 
-  if (window.__quietLayerOpenInNewTab) return;
-  window.__quietLayerOpenInNewTab = true;
+  if (window.__quietLayerStayPut) return;
+  window.__quietLayerStayPut = true;
 
   function log() {
     if (!DEBUG) return;
     var args = Array.prototype.slice.call(arguments);
-    args.unshift('[Open In New Tab]');
+    args.unshift('[Stay Put]');
     try {
       console.log.apply(console, args);
     } catch (e) { /* ignore */ }
   }
 
   try {
-    console.info('[Open In New Tab] v1.0.0 active — same-origin links → new tab');
+    console.info('[Stay Put] v1.0.0 active — same-origin links → new tab');
   } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
@@ -265,7 +265,7 @@
       a.href = url;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
-      a.setAttribute('data-ql-open-in-new-tab', 'open');
+      a.setAttribute('data-ql-stay-put', 'open');
       a.style.cssText = 'display:none!important';
       root.appendChild(a);
       a.click();
@@ -338,7 +338,7 @@
 
     var pathTarget = e.target;
     if (!pathTarget || !pathTarget.closest) return;
-    if (pathTarget.closest && pathTarget.closest('[data-ql-open-in-new-tab]')) return;
+    if (pathTarget.closest && pathTarget.closest('[data-ql-stay-put]')) return;
 
     var anchor = pathTarget.closest('a[href]');
     if (!anchor) return;
@@ -387,8 +387,8 @@
 
   function installHistoryGuards() {
     if (!spaGuardActiveHere()) return;
-    if (history.__qlOpenInNewTabGuarded) return;
-    history.__qlOpenInNewTabGuarded = true;
+    if (history.__qlStayPutGuarded) return;
+    history.__qlStayPutGuarded = true;
 
     var origPush = history.pushState;
     var origReplace = history.replaceState;
