@@ -43,14 +43,14 @@ Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to
 4. While locked, links open in a **new** tab; this tab stays on the saved URL
 5. Unlock from the control or the same shortcut (state is per-tab via `sessionStorage`)
 
-**UI variant test (v1.3.0):** `UI_VARIANT` defaults to `'all'`, which stacks six designs so you can compare them. Number tags (1–6) label each control. Click toggles lock; **Alt+click** cycles to a single variant (or back to all). When you’ve picked a favorite, set `UI_VARIANT` to `1`–`6` and remove the rest later.
+**UI variants (v1.3.1):** default is **`4`** (centered top-bar control — middle of Notion’s header, clear of Zen’s right sidebar). Set `UI_VARIANT` to `'all'` to stack all six again, or `1`–`6` for one. **Alt+click** cycles variants (session override for the tab).
 
 | # | Variant | Idea |
 |---|---------|------|
 | 1 | Hairline rail | Thin right-edge color strip; label on hover |
 | 2 | Corner pin | Pin icon + Pin / Pinned |
 | 3 | Status dot | Tiny dot; hover shows `Launcher · ⌘⇧L` |
-| 4 | Top bar | Quiet Notion-like text near the top-right chrome |
+| 4 | Top bar | Quiet Notion-like text, **centered** in the top bar |
 | 5 | Locked-only | Hidden when unlocked; “Launcher” chip when locked |
 | 6 | Segmented | `Free` \| `Launcher` two-state control |
 
@@ -63,7 +63,7 @@ While locked, the script:
 Optional config near the top of the script:
 
 - `SHOW_PEEK_TOGGLE` (default `true`) — show launcher UI (any variant)
-- `UI_VARIANT` (default `'all'`) — `'all'` or `1`–`6` (see table above)
+- `UI_VARIANT` (default `4`) — `'all'` or `1`–`6` (see table above)
 - `GUARD_SPA_NAVIGATION` (default `true`)
 - `INTERCEPT_EXTERNAL_LINKS` (default `false`)
 - `DEBUG` (default `false`)
@@ -80,7 +80,7 @@ Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inj
 4. Fully **close all Notion tabs**, open a fresh one
 5. Open DevTools → Console and look for: `[Notion Locked Launcher] active`
 6. Click a UI control or press **Cmd+Shift+L** — you should get a toast when locked  
-   Console should show: `[Notion Locked Launcher] v1.3.0 active` (if you still see an older line, AdGuard is running a stale paste)
+   Console should show: `[Notion Locked Launcher] v1.3.1 active` (if you still see an older line, AdGuard is running a stale paste)
 
 If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering).
 
