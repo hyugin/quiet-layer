@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.2.2
+// @version      1.2.3
 // @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -108,7 +108,7 @@
 
   // Always announce once so Zen/AdGuard injection can be verified in DevTools.
   try {
-    console.info('[Notion Locked Launcher] active — Cmd+Shift+L to lock/unlock');
+    console.info('[Notion Locked Launcher] v1.2.3 active — peek or Cmd+Shift+L (no tab-title rewrite)');
   } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
@@ -234,7 +234,8 @@
   function clearLegacyTitleLockPrefix() {
     try {
       var t = String(document.title || '');
-      if (t.indexOf('🔒 ') === 0) document.title = t.slice(2);
+      var next = t.replace(/^🔒\s+/, '');
+      if (next !== t) document.title = next;
     } catch (e) { /* ignore */ }
   }
 
