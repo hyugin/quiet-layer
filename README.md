@@ -29,11 +29,7 @@ Optional userscripts live in [`userscripts/`](./userscripts/). The Notion favico
 
 ## Notion Locked Launcher (Zen / Firefox)
 
-<<<<<<< HEAD
 WebExtension in [`extensions/notion-locked-launcher/`](./extensions/notion-locked-launcher/) (tab menu + toolbar badge + Cmd+Shift+L). Load from `about:debugging`. For AdGuard-managed injection instead, see [`userscripts/notion-locked-launcher.user.js`](./userscripts/notion-locked-launcher.user.js).
-=======
-[`sine-mods/notion-locked-launcher/`](./sine-mods/notion-locked-launcher/) is a [Sine](https://github.com/CosmoCreeper/Sine) mod that locks a Notion tab as a launcher (tab menu + Cmd+Shift+L). It does **not** install via Zen’s built-in **Zen Mods** — install Sine first, then add the mod from that folder’s README.
->>>>>>> origin/main
 
 ## License
 
