@@ -43,7 +43,7 @@ Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to
 4. While locked, links open in a **new** tab; this tab stays on the saved URL
 5. Unlock with the same shortcut, or hover/click the blue rail (state is per-tab via `sessionStorage`)
 
-**UI (v1.3.3):** default is **`indicator`** — keyboard-first; no chrome when unlocked; blue hairline rail when locked (like variant 1, but status-only). Other designs remain for comparison via `UI_VARIANT` or **Alt+click**.
+**UI (v1.3.4):** default is **`indicator`** — keyboard-first; no chrome when unlocked; blue hairline rail when locked (like variant 1, but status-only). Other designs remain for comparison via `UI_VARIANT` or **Alt+click**.
 
 | Value | Variant | Idea |
 |-------|---------|------|
@@ -82,7 +82,7 @@ Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inj
 4. Fully **close all Notion tabs**, open a fresh one
 5. Open DevTools → Console and look for: `[Notion Locked Launcher] active`
 6. Press **Cmd+Shift+L** — toast + blue right-edge rail when locked  
-   Console should show: `[Notion Locked Launcher] v1.3.3 active` (if you still see an older line, AdGuard is running a stale paste)
+   Console should show: `[Notion Locked Launcher] v1.3.4 active` (if you still see an older line, AdGuard is running a stale paste)
 
 If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering).
 
