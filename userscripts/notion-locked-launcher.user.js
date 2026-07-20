@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.5.1
+// @version      1.5.0
 // @description  Lock a Notion tab as a launcher. Cmd+Shift+L cycles Soft → Strict → Off.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
@@ -680,16 +680,15 @@
       '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]{' +
         'display:inline-flex!important;opacity:.95!important;pointer-events:auto!important;' +
       '}' +
-      /* Strict = slate (sealed), Soft keeps Notion blue above */
       '#' + UI_ROOT_ID + ' .nll-v-indicator[data-nll-lock="strict"]{' +
-        'color:#334155!important;' +
+        'color:#183a5c!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-indicator[data-nll-lock="strict"]::before{' +
-        'background:#475569!important;' +
-        'box-shadow:-1px 0 6px rgba(51,65,85,.45)!important;' +
+        'background:#183a5c!important;' +
+        'box-shadow:-1px 0 6px rgba(24,58,92,.4)!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-indicator[data-nll-lock="strict"] .nll-label{' +
-        'color:#334155!important;' +
+        'color:#183a5c!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"].nll-expanded{' +
         'transform:translateX(0)!important;opacity:1!important;outline:none!important;' +
@@ -733,10 +732,6 @@
         'width:4px!important;background:#2383e2!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"] .nll-label{color:#0B6BCB!important;}' +
-      '#' + UI_ROOT_ID + ' .nll-v-rail[data-nll-lock="strict"][aria-pressed="true"]::before{' +
-        'background:#475569!important;' +
-      '}' +
-      '#' + UI_ROOT_ID + ' .nll-v-rail[data-nll-lock="strict"][aria-pressed="true"] .nll-label{color:#334155!important;}' +
       '#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"].nll-expanded{' +
         'transform:translateX(0)!important;' +
       '}' +
@@ -766,10 +761,6 @@
         'background:rgba(35,131,226,.12)!important;color:#0B6BCB!important;' +
         'border-color:rgba(35,131,226,.32)!important;opacity:.95!important;' +
         'transform:translateX(calc(100% - 24px))!important;' +
-      '}' +
-      '#' + UI_ROOT_ID + ' .nll-v-pin[data-nll-lock="strict"][aria-pressed="true"]{' +
-        'background:rgba(71,85,105,.14)!important;color:#334155!important;' +
-        'border-color:rgba(71,85,105,.4)!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"].nll-expanded{' +
         'transform:translateX(0)!important;' +
@@ -801,7 +792,6 @@
         'opacity:1!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"] .nll-dot{background:#2383e2!important;}' +
-      '#' + UI_ROOT_ID + ' .nll-v-dot[data-nll-lock="strict"][aria-pressed="true"] .nll-dot{background:#475569!important;}' +
       '#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"]{' +
         'opacity:.9!important;transform:translateX(calc(100% - 14px))!important;' +
       '}' +
@@ -829,12 +819,6 @@
       '#' + UI_ROOT_ID + ' .nll-v-topbar[aria-pressed="true"]:hover{' +
         'background:rgba(35,131,226,.16)!important;' +
       '}' +
-      '#' + UI_ROOT_ID + ' .nll-v-topbar[data-nll-lock="strict"][aria-pressed="true"]{' +
-        'color:#334155!important;background:rgba(71,85,105,.12)!important;' +
-      '}' +
-      '#' + UI_ROOT_ID + ' .nll-v-topbar[data-nll-lock="strict"][aria-pressed="true"]:hover{' +
-        'background:rgba(71,85,105,.18)!important;' +
-      '}' +
       /* In all-mode, keep #4’s index tag above the centered control */
       '#' + UI_ROOT_ID + ' .nll-v-topbar .nll-tag.nll-tag-top{' +
         'left:50%!important;right:auto!important;transform:translateX(-50%)!important;' +
@@ -858,9 +842,6 @@
         'background:rgba(35,131,226,.92)!important;color:#fff!important;' +
         'box-shadow:0 2px 8px rgba(15,15,15,.12)!important;' +
       '}' +
-      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-lockedonly[data-nll-lock="strict"][aria-pressed="true"]{' +
-        'background:rgba(71,85,105,.94)!important;' +
-      '}' +
       '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-lockedonly[aria-pressed="true"] .nll-lockedonly-chip{' +
         'display:inline!important;font:11px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
         'letter-spacing:.02em!important;white-space:nowrap!important;' +
@@ -883,10 +864,6 @@
         'border-style:solid!important;border-color:rgba(35,131,226,.35)!important;' +
         'background:rgba(35,131,226,.92)!important;color:#fff!important;' +
         'opacity:.95!important;transform:translateX(calc(100% - 22px))!important;' +
-      '}' +
-      '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly[data-nll-lock="strict"][aria-pressed="true"]{' +
-        'border-color:rgba(71,85,105,.45)!important;' +
-        'background:rgba(71,85,105,.94)!important;' +
       '}' +
       '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly[aria-pressed="true"]:hover{' +
         'transform:translateX(0)!important;' +
@@ -917,11 +894,7 @@
       '#' + UI_ROOT_ID + ' .nll-v-segment .nll-seg[aria-pressed="true"]{' +
         'background:rgba(35,131,226,.14)!important;color:#0B6BCB!important;' +
       '}' +
-      '#' + UI_ROOT_ID + ' .nll-v-segment[data-nll-lock="strict"] .nll-seg-launch[aria-pressed="true"]{' +
-        'background:rgba(71,85,105,.16)!important;color:#334155!important;' +
-      '}' +
       '#' + UI_ROOT_ID + ' .nll-v-segment .nll-seg:focus-visible{outline:2px solid rgba(35,131,226,.45)!important;outline-offset:1px!important;}' +
-      '#' + UI_ROOT_ID + ' .nll-v-segment[data-nll-lock="strict"] .nll-seg:focus-visible{outline-color:rgba(71,85,105,.5)!important;}' +
 
       /* Stack offsets when showing a single non-all variant — reset awkward tops */
       '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-rail,' +
@@ -1554,7 +1527,7 @@
   // Announce once so Zen/AdGuard injection can be verified in DevTools.
   try {
     console.info(
-      '[Notion Locked Launcher] v1.5.1 active — Cmd+Shift+L cycles Soft → Strict → Off; now=' +
+      '[Notion Locked Launcher] v1.5.0 active — Cmd+Shift+L cycles Soft → Strict → Off; now=' +
         readLockMode()
     );
   } catch (eBoot) { /* ignore */ }

@@ -53,7 +53,7 @@ Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to
 
 Soft mode decides from **click DOM ancestry** (collection vs sidebar), not from the destination URL — Notion page ids look the same either way. If Notion renames collection classes, detection may need a selector update (`COLLECTION_ANCESTOR_SELECTOR` in the script).
 
-**UI (v1.5.1):** default is **`indicator`** — keyboard-first; no chrome when unlocked; **blue** rail in Soft, **slate** rail in Strict (plus Soft/Strict hover labels). Other designs remain for comparison via `UI_VARIANT` or **Alt+click**.
+**UI (v1.5.0):** default is **`indicator`** — keyboard-first; no chrome when unlocked; blue hairline rail when Soft/Strict (darker rail + “Strict” label in Strict). Other designs remain for comparison via `UI_VARIANT` or **Alt+click**.
 
 | Value | Variant | Idea |
 |-------|---------|------|
@@ -63,7 +63,7 @@ Soft mode decides from **click DOM ancestry** (collection vs sidebar), not from 
 | `3` | Status dot | Tiny dot; hover shows `Launcher · ⌘⇧L` |
 | `4` | Top bar | Quiet Notion-like text, centered in the top bar |
 | `5` | Locked-only | Hidden when unlocked; “Launcher” chip when locked |
-| `6` | Segmented | `Free` (off) \| `Launcher` (advances Soft/Strict) |
+| `6` | Segmented | `Free` \| `Launcher` two-state control |
 | `all` | All of 1–6 | Stacked A/B comparison |
 
 While locked, the script:
@@ -94,7 +94,7 @@ Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inj
 4. Fully **close all Notion tabs**, open a fresh one
 5. Open DevTools → Console and look for: `[Notion Locked Launcher] active`
 6. Press **Cmd+Shift+L** — cycles Soft → Strict → Off (toast + rail when locked)  
-   Console should show: `[Notion Locked Launcher] v1.5.1 active` (if you still see an older line, AdGuard is running a stale paste)
+   Console should show: `[Notion Locked Launcher] v1.5.0 active` (if you still see an older line, AdGuard is running a stale paste)
 
 If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering).
 
