@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.3.4
-// @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
+// @version      1.4.0
+// @description  Lock a Notion tab as a launcher: exit links open in new tabs; soft mode lets database/collection opens stay in-tab.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
 // @match        https://notion.com/*
@@ -39,7 +39,10 @@
  * 1. Open Notion → go to your launcher page (e.g. Tasks database).
  * 2. Lock with Cmd+Shift+L (primary). A thin blue right-edge rail appears
  *    while locked; click it to unlock. (See UI_VARIANT for other designs.)
- * 3. Sidebar / page / relation links open in a NEW tab; this tab stays put.
+ * 3. While locked (see LOCK_MODE):
+ *    - strict — any navigation away opens in a NEW tab; this tab stays put.
+ *    - soft (default) — sidebar / out-of-collection exits open in a NEW tab;
+ *      database / collection row opens stay in this tab (Notion peek or page).
  *
  * - State is per-tab via sessionStorage (not shared across tabs).
  * - Click capture handles <a href> navigations.
@@ -48,6 +51,8 @@
  *
  * Known limitations
  * -----------------
+ * - Soft mode uses DOM ancestry (collection vs elsewhere); Notion class renames
+ *   can weaken detection until selectors are updated.
  * - Pure JS controls with no URL change still won’t be intercepted.
  * - If the browser blocks window.open(), allow pop-ups for Notion.
  */
@@ -61,6 +66,23 @@
 
   /** When true, external (non-Notion) links also open in a new tab from a locked launcher. */
   var INTERCEPT_EXTERNAL_LINKS = false;
+
+  /**
+   * Lock strictness while the tab is locked:
+   *   'soft'   — (default) exit navigations (sidebar, in-page links outside a
+   *              collection) open in a new tab; clicks inside a database /
+   *              collection view stay in this tab. Same-path peek/view query
+   *              changes (?p=, ?v=, …) also stay in-tab.
+   *   'strict' — any meaningful navigation away from the locked URL opens in
+   *              a new tab (v1.3 behavior).
+   */
+  var LOCK_MODE = 'soft';
+
+  /**
+   * How long (ms) after a soft-allowed collection click we also allow the
+   * matching SPA history mutation. Notion often pushStates after the click.
+   */
+  var SOFT_SPA_BYPASS_MS = 2000;
 
   /**
    * Show launcher UI. Set false to rely on the keyboard shortcut only.
@@ -136,7 +158,11 @@
 
   // Always announce once so Zen/AdGuard injection can be verified in DevTools.
   try {
-    console.info('[Notion Locked Launcher] v1.3.4 active — Cmd+Shift+L; blue rail when locked');
+    console.info(
+      '[Notion Locked Launcher] v1.4.0 active — Cmd+Shift+L; mode=' +
+        (LOCK_MODE === 'strict' ? 'strict' : 'soft') +
+        '; blue rail when locked'
+    );
   } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
@@ -188,20 +214,139 @@
    * Whether destination meaningfully navigates away from lockedUrl.
    * Compares origin + pathname + search; ignores hash-only differences
    * (Notion often uses fragments without leaving the page).
+   *
+   * In soft mode, same origin+pathname with only ephemeral peek/view query
+   * differences (?p=, ?pv=, ?v=, …) counts as "same page".
    */
   function isMeaningfullyDifferentUrl(destinationHref, lockedHref) {
     if (!destinationHref || !lockedHref) return true;
     try {
       var dest = new URL(destinationHref);
       var locked = new URL(lockedHref);
-      return (
-        dest.origin !== locked.origin ||
-        dest.pathname !== locked.pathname ||
-        dest.search !== locked.search
-      );
+      if (dest.origin !== locked.origin || dest.pathname !== locked.pathname) {
+        return true;
+      }
+      if (isSoftMode()) {
+        return normalizeEphemeralSearch(dest.search) !== normalizeEphemeralSearch(locked.search);
+      }
+      return dest.search !== locked.search;
     } catch (e) {
       return destinationHref !== lockedHref;
     }
+  }
+
+  function isSoftMode() {
+    return LOCK_MODE !== 'strict';
+  }
+
+  /**
+   * Query keys Notion uses for peeks / collection view selection on the same
+   * page path. Soft mode treats changes to only these as in-place UI.
+   */
+  var EPHEMERAL_SEARCH_KEYS = {
+    p: 1,
+    pv: 1,
+    peek: 1,
+    peekView: 1,
+    v: 1
+  };
+
+  function normalizeEphemeralSearch(search) {
+    var q = String(search || '');
+    if (q.charAt(0) === '?') q = q.slice(1);
+    if (!q) return '';
+    var kept = [];
+    var parts = q.split('&');
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i];
+      if (!part) continue;
+      var eq = part.indexOf('=');
+      var key = eq === -1 ? part : part.slice(0, eq);
+      try {
+        key = decodeURIComponent(key.replace(/\+/g, ' '));
+      } catch (e) { /* keep raw */ }
+      if (EPHEMERAL_SEARCH_KEYS[key]) continue;
+      kept.push(part);
+    }
+    kept.sort();
+    return kept.join('&');
+  }
+
+  /**
+   * Ancestors that mean "this click is opening something from a database /
+   * collection view" (table row, board card, list item, etc.).
+   * Notion renames classes occasionally — keep this list broad.
+   */
+  var COLLECTION_ANCESTOR_SELECTOR = [
+    '.notion-collection-view',
+    '.notion-collection-view-body',
+    '.notion-table-view',
+    '.notion-board-view',
+    '.notion-list-view',
+    '.notion-gallery-view',
+    '.notion-calendar-view',
+    '.notion-timeline-view',
+    '.notion-feed-view',
+    '.notion-collection-item',
+    '.notion-page-view-collection',
+    '[class*="collectionView"]',
+    '[class*="CollectionView"]',
+    '[data-testid*="collection"]'
+  ].join(',');
+
+  /** Sidebar / workspace chrome — always an "exit" in soft mode. */
+  var SIDEBAR_ANCESTOR_SELECTOR = [
+    '.notion-sidebar',
+    '.notion-sidebar-container',
+    '.notion-outliner',
+    '.notion-update-sidebar'
+  ].join(',');
+
+  function closestMatch(node, selector) {
+    if (!node || node.nodeType !== 1 || !node.closest) return null;
+    try {
+      return node.closest(selector);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function isCollectionContext(node) {
+    return !!closestMatch(node, COLLECTION_ANCESTOR_SELECTOR);
+  }
+
+  function isSidebarContext(node) {
+    if (closestMatch(node, SIDEBAR_ANCESTOR_SELECTOR)) return true;
+    // Fallback: walk up for aria-label / role landmarks Notion uses.
+    var el = node.nodeType === 1 ? node : null;
+    var depth = 0;
+    while (el && depth < 12) {
+      var label = (el.getAttribute && (el.getAttribute('aria-label') || '')) || '';
+      if (/sidebar|outliner/i.test(label)) return true;
+      el = el.parentElement;
+      depth++;
+    }
+    return false;
+  }
+
+  /** Soft mode: collection opens stay in-tab; sidebar is always an exit. */
+  function isSoftAllowedInTabNavigation(sourceNode) {
+    if (!isSoftMode() || !sourceNode) return false;
+    if (isSidebarContext(sourceNode)) return false;
+    return isCollectionContext(sourceNode);
+  }
+
+  // After a soft-allowed collection click, Notion often pushStates shortly after.
+  var spaBypassUntil = 0;
+
+  function armSpaBypass(ms) {
+    var duration = typeof ms === 'number' ? ms : SOFT_SPA_BYPASS_MS;
+    spaBypassUntil = Date.now() + duration;
+    log('SPA bypass armed for', duration, 'ms');
+  }
+
+  function hasSpaBypass() {
+    return Date.now() < spaBypassUntil;
   }
 
   // ---------------------------------------------------------------------------
@@ -233,9 +378,13 @@
       showToast('Could not save lock state (sessionStorage blocked).');
       return;
     }
-    log('Locked to', url);
+    log('Locked to', url, 'mode=', isSoftMode() ? 'soft' : 'strict');
     syncChromeUi();
-    showToast('Tab locked — links open in new tabs. (Cmd+Shift+L to unlock)');
+    showToast(
+      isSoftMode()
+        ? 'Tab locked (soft) — exits open in new tabs; database opens stay here. (Cmd+Shift+L)'
+        : 'Tab locked — links open in new tabs. (Cmd+Shift+L to unlock)'
+    );
   }
 
   function disableLock() {
@@ -1078,7 +1227,12 @@
     return false;
   }
 
-  function shouldOpenDestination(dest) {
+  /**
+   * @param {string} dest Absolute destination URL
+   * @param {Element|null} [sourceNode] Click / event target for soft-mode context
+   * @return {boolean} true → intercept and open in a new tab
+   */
+  function shouldOpenDestination(dest, sourceNode) {
     if (!dest) return false;
     if (!readIsLocked()) return false;
 
@@ -1103,6 +1257,12 @@
 
     if (!isMeaningfullyDifferentUrl(dest, location.href)) {
       log('Skip: destination matches current location', dest);
+      return false;
+    }
+
+    if (isSoftAllowedInTabNavigation(sourceNode)) {
+      log('Skip: soft mode collection open stays in-tab', dest);
+      armSpaBypass();
       return false;
     }
 
@@ -1135,7 +1295,10 @@
     }
 
     var dest = resolveAbsoluteUrl(anchor.getAttribute('href'));
-    if (!shouldOpenDestination(dest)) return;
+    // Soft mode also needs to see collection clicks that are not real <a>
+    // navigations — those are handled via SPA bypass armed from a broader
+    // pointerdown listener below. For anchors, pass the click target.
+    if (!shouldOpenDestination(dest, pathTarget)) return;
 
     log('Intercept click → new tab', dest);
 
@@ -1151,8 +1314,24 @@
     }
   }
 
+  /**
+   * Soft mode: many collection row opens are Notion React handlers without a
+   * useful href. Arm a short SPA bypass so the following pushState is allowed
+   * in-tab instead of forced into a new tab.
+   */
+  function onPointerDownSoftArm(e) {
+    if (!isSoftMode() || !readIsLocked()) return;
+    if (e.button != null && e.button !== 0) return;
+    var t = e.target;
+    if (!t || isOurUi(t)) return;
+    if (isSoftAllowedInTabNavigation(t)) {
+      armSpaBypass();
+    }
+  }
+
   // Install as early as possible (@run-at document-start).
   document.addEventListener('click', onClickCapture, true);
+  document.addEventListener('pointerdown', onPointerDownSoftArm, true);
 
   // ---------------------------------------------------------------------------
   // SPA navigation guard (pushState / replaceState / popstate)
@@ -1164,8 +1343,13 @@
     if (!GUARD_SPA_NAVIGATION) return false;
     if (!readIsLocked() || restoringHome) return false;
     if (url == null || url === '') return false;
+    if (isSoftMode() && hasSpaBypass()) {
+      log('SPA bypass: allow history mutation', url);
+      return null;
+    }
     var abs = resolveAbsoluteUrl(String(url), location.href);
-    return shouldOpenDestination(abs) ? abs : null;
+    // No click source for history — soft collection exemption is via bypass.
+    return shouldOpenDestination(abs, null) ? abs : null;
   }
 
   function blockHistoryAndOpen(abs) {

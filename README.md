@@ -27,7 +27,7 @@ https://raw.githubusercontent.com/hyugin/quiet-layer/main/quiet-layer.txt
 
 Optional userscripts live in [`userscripts/`](./userscripts/). The Notion favicon lock is also included as an AdGuard JS rule in `quiet-layer.txt` (enable **Allow scripts and CSS / trusted** on this filter). See [`userscripts/README.md`](./userscripts/README.md).
 
-- **Notion Locked Launcher** — pin a Notion tab; links open in new tabs ([script](./userscripts/notion-locked-launcher.user.js), optional [WebExtension](./extensions/notion-locked-launcher/))
+- **Notion Locked Launcher** — pin a Notion tab; exit links open in new tabs (soft mode keeps database/collection opens in-tab) ([script](./userscripts/notion-locked-launcher.user.js), optional [WebExtension](./extensions/notion-locked-launcher/))
 - **Stay Put** — always-on same-origin → new tab for GitHub / Jira / Notion ([script](./userscripts/stay-put.user.js))
 
 ## License

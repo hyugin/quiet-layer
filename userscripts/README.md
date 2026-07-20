@@ -40,10 +40,19 @@ Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to
 1. Paste [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) into AdGuard → **Extensions** → **+**
 2. Open Notion → go to your launcher page (e.g. Tasks database)
 3. Lock with **Cmd+Shift+L** — a thin **blue rail** appears on the right edge while locked
-4. While locked, links open in a **new** tab; this tab stays on the saved URL
+4. While locked (see **Lock modes** below), exit navigations open in a **new** tab; this tab stays on the saved URL
 5. Unlock with the same shortcut, or hover/click the blue rail (state is per-tab via `sessionStorage`)
 
-**UI (v1.3.4):** default is **`indicator`** — keyboard-first; no chrome when unlocked; blue hairline rail when locked (like variant 1, but status-only). Other designs remain for comparison via `UI_VARIANT` or **Alt+click**.
+#### Lock modes (`LOCK_MODE`)
+
+| Value | Behavior |
+|-------|----------|
+| `'soft'` | **Default (v1.4).** Sidebar / links outside a database open in a new tab. Clicks inside a collection view (table row, board card, list item, …) stay in this tab. Same-path peek/view query changes (`?p=`, `?v=`, …) also stay in-tab. |
+| `'strict'` | Previous behavior: any meaningful navigation away from the locked URL opens in a new tab. |
+
+Soft mode decides from **click DOM ancestry** (collection vs sidebar), not from the destination URL — Notion page ids look the same either way. If Notion renames collection classes, detection may need a selector update (`COLLECTION_ANCESTOR_SELECTOR` in the script).
+
+**UI (v1.4.0):** default is **`indicator`** — keyboard-first; no chrome when unlocked; blue hairline rail when locked (like variant 1, but status-only). Other designs remain for comparison via `UI_VARIANT` or **Alt+click**.
 
 | Value | Variant | Idea |
 |-------|---------|------|
@@ -58,12 +67,14 @@ Install via AdGuard for Mac’s userscript manager (see [How to install](#how-to
 
 While locked, the script:
 
-- Intercepts `<a href>` clicks (capturing phase)
-- Guards `history.pushState` / `replaceState` / `popstate` so Notion SPA navigations that skip anchors still open in a new tab
-- Leaves the locked tab on the saved URL
+- Intercepts `<a href>` clicks (capturing phase), with soft-mode exemptions for collection ancestry
+- Guards `history.pushState` / `replaceState` / `popstate` so Notion SPA navigations that skip anchors still open in a new tab (soft mode briefly allows SPA after a collection click)
+- Leaves the locked tab on the saved URL for exit navigations
 
 Optional config near the top of the script:
 
+- `LOCK_MODE` (default `'soft'`) — `'soft'` or `'strict'` (see table above)
+- `SOFT_SPA_BYPASS_MS` (default `2000`) — how long after a soft collection click to allow the matching SPA history change
 - `SHOW_PEEK_TOGGLE` (default `true`) — show launcher UI (any variant)
 - `UI_VARIANT` (default `'indicator'`) — `'indicator'`, `'all'`, or `1`–`6` (see table above)
 - `GUARD_SPA_NAVIGATION` (default `true`)
@@ -82,7 +93,7 @@ Zen is often **not** in AdGuard’s filtered-apps list, so userscripts never inj
 4. Fully **close all Notion tabs**, open a fresh one
 5. Open DevTools → Console and look for: `[Notion Locked Launcher] active`
 6. Press **Cmd+Shift+L** — toast + blue right-edge rail when locked  
-   Console should show: `[Notion Locked Launcher] v1.3.4 active` (if you still see an older line, AdGuard is running a stale paste)
+   Console should show: `[Notion Locked Launcher] v1.4.0 active` (if you still see an older line, AdGuard is running a stale paste)
 
 If that console line is missing, AdGuard is not injecting into Zen yet (filtered apps / HTTPS filtering).
 
