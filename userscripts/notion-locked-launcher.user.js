@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Notion Locked Launcher
 // @namespace    https://github.com/hyugin/quiet-layer
-// @version      1.3.4
-// @description  Lock a Notion tab as a permanent launcher: navigation links open in new tabs; the locked tab stays put.
+// @version      1.5.1
+// @description  Lock a Notion tab as a launcher. Cmd+Shift+L cycles Soft → Strict → Off.
 // @author       Quiet Layer
 // @match        https://www.notion.com/*
 // @match        https://notion.com/*
@@ -37,9 +37,13 @@
  * Usage
  * -----
  * 1. Open Notion → go to your launcher page (e.g. Tasks database).
- * 2. Lock with Cmd+Shift+L (primary). A thin blue right-edge rail appears
- *    while locked; click it to unlock. (See UI_VARIANT for other designs.)
- * 3. Sidebar / page / relation links open in a NEW tab; this tab stays put.
+ * 2. Cycle lock with Cmd+Shift+L (or click the blue rail):
+ *      Off → Soft → Strict → Off
+ *    A thin blue right-edge rail appears while Soft or Strict.
+ * 3. Modes:
+ *    - soft — sidebar / out-of-collection exits open in a NEW tab;
+ *      database / collection row opens stay in this tab (Notion peek or page).
+ *    - strict — any navigation away opens in a NEW tab; this tab stays put.
  *
  * - State is per-tab via sessionStorage (not shared across tabs).
  * - Click capture handles <a href> navigations.
@@ -48,6 +52,8 @@
  *
  * Known limitations
  * -----------------
+ * - Soft mode uses DOM ancestry (collection vs elsewhere); Notion class renames
+ *   can weaken detection until selectors are updated.
  * - Pure JS controls with no URL change still won’t be intercepted.
  * - If the browser blocks window.open(), allow pop-ups for Notion.
  */
@@ -61,6 +67,18 @@
 
   /** When true, external (non-Notion) links also open in a new tab from a locked launcher. */
   var INTERCEPT_EXTERNAL_LINKS = false;
+
+  /**
+   * How long (ms) after a soft-allowed collection click we also allow the
+   * matching SPA history mutation. Notion often pushStates after the click.
+   */
+  var SOFT_SPA_BYPASS_MS = 2000;
+
+  /**
+   * Cmd+Shift+L / rail click cycle order. First press from Off enters the
+   * first entry (soft). Last mode advances to Off.
+   */
+  var LOCK_CYCLE = ['soft', 'strict'];
 
   /**
    * Show launcher UI. Set false to rely on the keyboard shortcut only.
@@ -92,6 +110,8 @@
 
   /** sessionStorage keys — per-tab only (not localStorage). */
   var STORAGE_KEY_LOCKED = 'notionLockedLauncher.isLocked';
+  /** 'soft' | 'strict' while locked; absent when off. */
+  var STORAGE_KEY_MODE = 'notionLockedLauncher.lockMode';
   var STORAGE_KEY_URL = 'notionLockedLauncher.lockedUrl';
   /** Bumped key so older A/B session overrides don’t stick after the default change. */
   var STORAGE_KEY_VARIANT = 'notionLockedLauncher.uiVariant.v2';
@@ -133,11 +153,6 @@
       console.log.apply(console, args);
     } catch (e) { /* ignore */ }
   }
-
-  // Always announce once so Zen/AdGuard injection can be verified in DevTools.
-  try {
-    console.info('[Notion Locked Launcher] v1.3.4 active — Cmd+Shift+L; blue rail when locked');
-  } catch (e) { /* ignore */ }
 
   // ---------------------------------------------------------------------------
   // Host / URL helpers
@@ -188,32 +203,163 @@
    * Whether destination meaningfully navigates away from lockedUrl.
    * Compares origin + pathname + search; ignores hash-only differences
    * (Notion often uses fragments without leaving the page).
+   *
+   * In soft mode, same origin+pathname with only ephemeral peek/view query
+   * differences (?p=, ?pv=, ?v=, …) counts as "same page".
    */
   function isMeaningfullyDifferentUrl(destinationHref, lockedHref) {
     if (!destinationHref || !lockedHref) return true;
     try {
       var dest = new URL(destinationHref);
       var locked = new URL(lockedHref);
-      return (
-        dest.origin !== locked.origin ||
-        dest.pathname !== locked.pathname ||
-        dest.search !== locked.search
-      );
+      if (dest.origin !== locked.origin || dest.pathname !== locked.pathname) {
+        return true;
+      }
+      if (isSoftMode()) {
+        return normalizeEphemeralSearch(dest.search) !== normalizeEphemeralSearch(locked.search);
+      }
+      return dest.search !== locked.search;
     } catch (e) {
       return destinationHref !== lockedHref;
     }
   }
 
+  function isSoftMode() {
+    return readLockMode() === 'soft';
+  }
+
+  /**
+   * Query keys Notion uses for peeks / collection view selection on the same
+   * page path. Soft mode treats changes to only these as in-place UI.
+   */
+  var EPHEMERAL_SEARCH_KEYS = {
+    p: 1,
+    pv: 1,
+    peek: 1,
+    peekView: 1,
+    v: 1
+  };
+
+  function normalizeEphemeralSearch(search) {
+    var q = String(search || '');
+    if (q.charAt(0) === '?') q = q.slice(1);
+    if (!q) return '';
+    var kept = [];
+    var parts = q.split('&');
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i];
+      if (!part) continue;
+      var eq = part.indexOf('=');
+      var key = eq === -1 ? part : part.slice(0, eq);
+      try {
+        key = decodeURIComponent(key.replace(/\+/g, ' '));
+      } catch (e) { /* keep raw */ }
+      if (EPHEMERAL_SEARCH_KEYS[key]) continue;
+      kept.push(part);
+    }
+    kept.sort();
+    return kept.join('&');
+  }
+
+  /**
+   * Ancestors that mean "this click is opening something from a database /
+   * collection view" (table row, board card, list item, etc.).
+   * Notion renames classes occasionally — keep this list broad.
+   */
+  var COLLECTION_ANCESTOR_SELECTOR = [
+    '.notion-collection-view',
+    '.notion-collection-view-body',
+    '.notion-table-view',
+    '.notion-board-view',
+    '.notion-list-view',
+    '.notion-gallery-view',
+    '.notion-calendar-view',
+    '.notion-timeline-view',
+    '.notion-feed-view',
+    '.notion-collection-item',
+    '.notion-page-view-collection',
+    '[class*="collectionView"]',
+    '[class*="CollectionView"]',
+    '[data-testid*="collection"]'
+  ].join(',');
+
+  /** Sidebar / workspace chrome — always an "exit" in soft mode. */
+  var SIDEBAR_ANCESTOR_SELECTOR = [
+    '.notion-sidebar',
+    '.notion-sidebar-container',
+    '.notion-outliner',
+    '.notion-update-sidebar'
+  ].join(',');
+
+  function closestMatch(node, selector) {
+    if (!node || node.nodeType !== 1 || !node.closest) return null;
+    try {
+      return node.closest(selector);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function isCollectionContext(node) {
+    return !!closestMatch(node, COLLECTION_ANCESTOR_SELECTOR);
+  }
+
+  function isSidebarContext(node) {
+    if (closestMatch(node, SIDEBAR_ANCESTOR_SELECTOR)) return true;
+    // Fallback: walk up for aria-label / role landmarks Notion uses.
+    var el = node.nodeType === 1 ? node : null;
+    var depth = 0;
+    while (el && depth < 12) {
+      var label = (el.getAttribute && (el.getAttribute('aria-label') || '')) || '';
+      if (/sidebar|outliner/i.test(label)) return true;
+      el = el.parentElement;
+      depth++;
+    }
+    return false;
+  }
+
+  /** Soft mode: collection opens stay in-tab; sidebar is always an exit. */
+  function isSoftAllowedInTabNavigation(sourceNode) {
+    if (!isSoftMode() || !sourceNode) return false;
+    if (isSidebarContext(sourceNode)) return false;
+    return isCollectionContext(sourceNode);
+  }
+
+  // After a soft-allowed collection click, Notion often pushStates shortly after.
+  var spaBypassUntil = 0;
+
+  function armSpaBypass(ms) {
+    var duration = typeof ms === 'number' ? ms : SOFT_SPA_BYPASS_MS;
+    spaBypassUntil = Date.now() + duration;
+    log('SPA bypass armed for', duration, 'ms');
+  }
+
+  function hasSpaBypass() {
+    return Date.now() < spaBypassUntil;
+  }
+
   // ---------------------------------------------------------------------------
   // Lock state (sessionStorage — tab-scoped)
+  // Cycle: Off → Soft → Strict → Off (Cmd+Shift+L / rail click)
   // ---------------------------------------------------------------------------
 
-  function readIsLocked() {
+  /**
+   * @return {'off'|'soft'|'strict'}
+   */
+  function readLockMode() {
     try {
-      return sessionStorage.getItem(STORAGE_KEY_LOCKED) === '1';
+      var mode = sessionStorage.getItem(STORAGE_KEY_MODE);
+      if (mode === 'soft' || mode === 'strict') return mode;
+      // Legacy binary lock (pre-1.5) → treat as soft.
+      if (sessionStorage.getItem(STORAGE_KEY_LOCKED) === '1') return 'soft';
+      return 'off';
     } catch (e) {
-      return false;
+      return 'off';
     }
+  }
+
+  function readIsLocked() {
+    return readLockMode() !== 'off';
   }
 
   function readLockedUrl() {
@@ -224,33 +370,81 @@
     }
   }
 
-  function enableLock() {
-    var url = location.href;
+  function toastForMode(mode) {
+    if (mode === 'soft') {
+      return 'Soft lock — exits → new tab; database opens stay here. (⌘⇧L → Strict)';
+    }
+    if (mode === 'strict') {
+      return 'Strict lock — all links → new tab. (⌘⇧L → Off)';
+    }
+    return 'Unlocked. (⌘⇧L → Soft)';
+  }
+
+  /**
+   * @param {'off'|'soft'|'strict'} mode
+   * @param {{silent?: boolean}} [opts]
+   */
+  function setLockMode(mode, opts) {
+    var silent = opts && opts.silent;
+    if (mode !== 'soft' && mode !== 'strict' && mode !== 'off') mode = 'off';
+
+    if (mode === 'off') {
+      try {
+        sessionStorage.removeItem(STORAGE_KEY_LOCKED);
+        sessionStorage.removeItem(STORAGE_KEY_MODE);
+        sessionStorage.removeItem(STORAGE_KEY_URL);
+      } catch (e) { /* ignore */ }
+      log('Unlocked');
+      syncChromeUi();
+      if (!silent) showToast(toastForMode('off'));
+      return;
+    }
+
+    var wasLocked = readIsLocked();
+    var url = wasLocked ? (readLockedUrl() || location.href) : location.href;
     try {
       sessionStorage.setItem(STORAGE_KEY_LOCKED, '1');
+      sessionStorage.setItem(STORAGE_KEY_MODE, mode);
       sessionStorage.setItem(STORAGE_KEY_URL, url);
-    } catch (e) {
+    } catch (e2) {
       showToast('Could not save lock state (sessionStorage blocked).');
       return;
     }
-    log('Locked to', url);
+    log('Locked to', url, 'mode=', mode);
     syncChromeUi();
-    showToast('Tab locked — links open in new tabs. (Cmd+Shift+L to unlock)');
+    if (!silent) showToast(toastForMode(mode));
+  }
+
+  /** Advance Off → Soft → Strict → Off. */
+  function cycleLock() {
+    var mode = readLockMode();
+    if (mode === 'off') {
+      var first = LOCK_CYCLE[0] || 'soft';
+      setLockMode(first);
+      return;
+    }
+    var idx = -1;
+    for (var i = 0; i < LOCK_CYCLE.length; i++) {
+      if (LOCK_CYCLE[i] === mode) { idx = i; break; }
+    }
+    if (idx < 0 || idx >= LOCK_CYCLE.length - 1) {
+      setLockMode('off');
+      return;
+    }
+    setLockMode(LOCK_CYCLE[idx + 1]);
+  }
+
+  /** @deprecated Use setLockMode / cycleLock — kept for clarity at call sites. */
+  function enableLock() {
+    setLockMode('soft');
   }
 
   function disableLock() {
-    try {
-      sessionStorage.removeItem(STORAGE_KEY_LOCKED);
-      sessionStorage.removeItem(STORAGE_KEY_URL);
-    } catch (e) { /* ignore */ }
-    log('Unlocked');
-    syncChromeUi();
-    showToast('Tab unlocked.');
+    setLockMode('off');
   }
 
   function toggleLock() {
-    if (readIsLocked()) disableLock();
-    else enableLock();
+    cycleLock();
   }
 
   function syncChromeUi() {
@@ -486,6 +680,17 @@
       '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]{' +
         'display:inline-flex!important;opacity:.95!important;pointer-events:auto!important;' +
       '}' +
+      /* Strict = slate (sealed), Soft keeps Notion blue above */
+      '#' + UI_ROOT_ID + ' .nll-v-indicator[data-nll-lock="strict"]{' +
+        'color:#334155!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-indicator[data-nll-lock="strict"]::before{' +
+        'background:#475569!important;' +
+        'box-shadow:-1px 0 6px rgba(51,65,85,.45)!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-indicator[data-nll-lock="strict"] .nll-label{' +
+        'color:#334155!important;' +
+      '}' +
       '#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-indicator[aria-pressed="true"].nll-expanded{' +
         'transform:translateX(0)!important;opacity:1!important;outline:none!important;' +
       '}' +
@@ -528,6 +733,10 @@
         'width:4px!important;background:#2383e2!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"] .nll-label{color:#0B6BCB!important;}' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail[data-nll-lock="strict"][aria-pressed="true"]::before{' +
+        'background:#475569!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-rail[data-nll-lock="strict"][aria-pressed="true"] .nll-label{color:#334155!important;}' +
       '#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-rail[aria-pressed="true"].nll-expanded{' +
         'transform:translateX(0)!important;' +
       '}' +
@@ -557,6 +766,10 @@
         'background:rgba(35,131,226,.12)!important;color:#0B6BCB!important;' +
         'border-color:rgba(35,131,226,.32)!important;opacity:.95!important;' +
         'transform:translateX(calc(100% - 24px))!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-pin[data-nll-lock="strict"][aria-pressed="true"]{' +
+        'background:rgba(71,85,105,.14)!important;color:#334155!important;' +
+        'border-color:rgba(71,85,105,.4)!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"]:hover,#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"]:focus-visible,#' + UI_ROOT_ID + ' .nll-v-pin[aria-pressed="true"].nll-expanded{' +
         'transform:translateX(0)!important;' +
@@ -588,6 +801,7 @@
         'opacity:1!important;' +
       '}' +
       '#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"] .nll-dot{background:#2383e2!important;}' +
+      '#' + UI_ROOT_ID + ' .nll-v-dot[data-nll-lock="strict"][aria-pressed="true"] .nll-dot{background:#475569!important;}' +
       '#' + UI_ROOT_ID + ' .nll-v-dot[aria-pressed="true"]{' +
         'opacity:.9!important;transform:translateX(calc(100% - 14px))!important;' +
       '}' +
@@ -615,6 +829,12 @@
       '#' + UI_ROOT_ID + ' .nll-v-topbar[aria-pressed="true"]:hover{' +
         'background:rgba(35,131,226,.16)!important;' +
       '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-topbar[data-nll-lock="strict"][aria-pressed="true"]{' +
+        'color:#334155!important;background:rgba(71,85,105,.12)!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-topbar[data-nll-lock="strict"][aria-pressed="true"]:hover{' +
+        'background:rgba(71,85,105,.18)!important;' +
+      '}' +
       /* In all-mode, keep #4’s index tag above the centered control */
       '#' + UI_ROOT_ID + ' .nll-v-topbar .nll-tag.nll-tag-top{' +
         'left:50%!important;right:auto!important;transform:translateX(-50%)!important;' +
@@ -638,6 +858,9 @@
         'background:rgba(35,131,226,.92)!important;color:#fff!important;' +
         'box-shadow:0 2px 8px rgba(15,15,15,.12)!important;' +
       '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-lockedonly[data-nll-lock="strict"][aria-pressed="true"]{' +
+        'background:rgba(71,85,105,.94)!important;' +
+      '}' +
       '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-lockedonly[aria-pressed="true"] .nll-lockedonly-chip{' +
         'display:inline!important;font:11px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;' +
         'letter-spacing:.02em!important;white-space:nowrap!important;' +
@@ -660,6 +883,10 @@
         'border-style:solid!important;border-color:rgba(35,131,226,.35)!important;' +
         'background:rgba(35,131,226,.92)!important;color:#fff!important;' +
         'opacity:.95!important;transform:translateX(calc(100% - 22px))!important;' +
+      '}' +
+      '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly[data-nll-lock="strict"][aria-pressed="true"]{' +
+        'border-color:rgba(71,85,105,.45)!important;' +
+        'background:rgba(71,85,105,.94)!important;' +
       '}' +
       '#' + UI_ROOT_ID + '[data-nll-mode="all"] .nll-v-lockedonly[aria-pressed="true"]:hover{' +
         'transform:translateX(0)!important;' +
@@ -690,7 +917,11 @@
       '#' + UI_ROOT_ID + ' .nll-v-segment .nll-seg[aria-pressed="true"]{' +
         'background:rgba(35,131,226,.14)!important;color:#0B6BCB!important;' +
       '}' +
+      '#' + UI_ROOT_ID + ' .nll-v-segment[data-nll-lock="strict"] .nll-seg-launch[aria-pressed="true"]{' +
+        'background:rgba(71,85,105,.16)!important;color:#334155!important;' +
+      '}' +
       '#' + UI_ROOT_ID + ' .nll-v-segment .nll-seg:focus-visible{outline:2px solid rgba(35,131,226,.45)!important;outline-offset:1px!important;}' +
+      '#' + UI_ROOT_ID + ' .nll-v-segment[data-nll-lock="strict"] .nll-seg:focus-visible{outline-color:rgba(71,85,105,.5)!important;}' +
 
       /* Stack offsets when showing a single non-all variant — reset awkward tops */
       '#' + UI_ROOT_ID + '[data-nll-mode="single"] .nll-v-rail,' +
@@ -729,7 +960,7 @@
         cycleUiVariant();
         return;
       }
-      toggleLock();
+      cycleLock();
     }, true);
   }
 
@@ -828,9 +1059,15 @@
           cycleUiVariant();
           return;
         }
-        var locked = readIsLocked();
-        if (wantLocked && !locked) enableLock();
-        else if (!wantLocked && locked) disableLock();
+        if (!wantLocked) {
+          setLockMode('off');
+          return;
+        }
+        // Launcher segment advances Soft ↔ Strict (enters Soft from Off).
+        var m = readLockMode();
+        if (m === 'off') setLockMode('soft');
+        else if (m === 'soft') setLockMode('strict');
+        else setLockMode('soft');
       }
       freeBtn.addEventListener('mousedown', stopNotion, true);
       launchBtn.addEventListener('mousedown', stopNotion, true);
@@ -847,8 +1084,8 @@
     el.setAttribute('data-nll-variant', String(num));
     el.setAttribute('aria-label', meta.name + ' — toggle locked launcher (Alt+click to cycle variants)');
     el.title = num === 'indicator'
-      ? 'Launcher locked — click to unlock · Cmd+Shift+L'
-      : meta.name + ' — click to toggle · Alt+click to cycle variants · Cmd+Shift+L';
+      ? 'Cmd+Shift+L cycles Soft → Strict → Off'
+      : meta.name + ' — click to cycle Soft → Strict → Off · Alt+click to cycle variants';
 
     if (showTags) {
       // Top-bar sits in the header; tag above it. Others get a side index.
@@ -866,44 +1103,58 @@
   function updateVariantControl(el, locked) {
     if (!el) return;
     var num = variantKeyFromEl(el);
+    var mode = readLockMode();
+    var modeLabel = mode === 'soft' ? 'Soft' : mode === 'strict' ? 'Strict' : 'Off';
     var titleBase = (VARIANT_META[num] ? VARIANT_META[num].name : 'Launcher') +
-      ' — click to toggle · Alt+click to cycle · Cmd+Shift+L';
+      ' — click cycles Soft → Strict → Off · Alt+click variants · Cmd+Shift+L';
 
     if (num === 'indicator') {
       el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      el.setAttribute('data-nll-lock', mode);
       el.title = locked
-        ? 'Launcher locked — click to unlock · Cmd+Shift+L'
-        : 'Lock with Cmd+Shift+L';
+        ? modeLabel + ' lock — click / ⌘⇧L cycles Soft → Strict → Off'
+        : 'Lock with Cmd+Shift+L (Soft → Strict → Off)';
       var li = el.querySelector('.nll-label');
-      if (li) li.textContent = 'Unlock · ⌘⇧L';
+      if (li) {
+        li.textContent = mode === 'soft'
+          ? 'Soft · ⌘⇧L'
+          : mode === 'strict'
+            ? 'Strict · ⌘⇧L'
+            : 'Unlock · ⌘⇧L';
+      }
     } else if (num === 1) {
       el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      el.setAttribute('data-nll-lock', mode);
       var l1 = el.querySelector('.nll-label');
-      if (l1) l1.textContent = locked ? 'Unlock' : 'Lock';
+      if (l1) l1.textContent = locked ? modeLabel : 'Lock';
       el.title = titleBase;
     } else if (num === 2) {
       el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      el.setAttribute('data-nll-lock', mode);
       var icon = el.querySelector('.nll-icon');
       var l2 = el.querySelector('.nll-label');
       if (icon) icon.innerHTML = svgPin(locked);
-      if (l2) l2.textContent = locked ? 'Pinned' : 'Pin';
+      if (l2) l2.textContent = locked ? modeLabel : 'Pin';
       el.title = titleBase;
     } else if (num === 3) {
       el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      el.setAttribute('data-nll-lock', mode);
       var l3 = el.querySelector('.nll-label');
-      if (l3) l3.textContent = locked ? 'Launcher · ⌘⇧L' : 'Launcher · ⌘⇧L';
+      if (l3) l3.textContent = locked ? modeLabel + ' · ⌘⇧L' : 'Launcher · ⌘⇧L';
       el.title = titleBase;
     } else if (num === 4) {
       el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      el.setAttribute('data-nll-lock', mode);
       var l4 = el.querySelector('.nll-label');
-      if (l4) l4.textContent = locked ? 'Locked' : 'Lock tab';
+      if (l4) l4.textContent = locked ? modeLabel : 'Lock tab';
       el.title = titleBase;
     } else if (num === 5) {
       el.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      el.setAttribute('data-nll-lock', mode);
       var chip = el.querySelector('.nll-lockedonly-chip');
       el.classList.remove('nll-hidden-unlocked');
       if (locked) {
-        if (chip) chip.textContent = 'Launcher';
+        if (chip) chip.textContent = modeLabel;
       } else if (isAllMode()) {
         if (chip) chip.textContent = 'hidden until locked';
       } else {
@@ -915,7 +1166,11 @@
       var freeBtn = el.querySelector('.nll-seg-free');
       var launchBtn = el.querySelector('.nll-seg-launch');
       if (freeBtn) freeBtn.setAttribute('aria-pressed', locked ? 'false' : 'true');
-      if (launchBtn) launchBtn.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      if (launchBtn) {
+        launchBtn.setAttribute('aria-pressed', locked ? 'true' : 'false');
+        launchBtn.textContent = locked ? modeLabel : 'Launcher';
+      }
+      el.setAttribute('data-nll-lock', mode);
       el.title = titleBase;
     }
   }
@@ -1078,7 +1333,12 @@
     return false;
   }
 
-  function shouldOpenDestination(dest) {
+  /**
+   * @param {string} dest Absolute destination URL
+   * @param {Element|null} [sourceNode] Click / event target for soft-mode context
+   * @return {boolean} true → intercept and open in a new tab
+   */
+  function shouldOpenDestination(dest, sourceNode) {
     if (!dest) return false;
     if (!readIsLocked()) return false;
 
@@ -1103,6 +1363,12 @@
 
     if (!isMeaningfullyDifferentUrl(dest, location.href)) {
       log('Skip: destination matches current location', dest);
+      return false;
+    }
+
+    if (isSoftAllowedInTabNavigation(sourceNode)) {
+      log('Skip: soft mode collection open stays in-tab', dest);
+      armSpaBypass();
       return false;
     }
 
@@ -1135,7 +1401,10 @@
     }
 
     var dest = resolveAbsoluteUrl(anchor.getAttribute('href'));
-    if (!shouldOpenDestination(dest)) return;
+    // Soft mode also needs to see collection clicks that are not real <a>
+    // navigations — those are handled via SPA bypass armed from a broader
+    // pointerdown listener below. For anchors, pass the click target.
+    if (!shouldOpenDestination(dest, pathTarget)) return;
 
     log('Intercept click → new tab', dest);
 
@@ -1151,8 +1420,24 @@
     }
   }
 
+  /**
+   * Soft mode: many collection row opens are Notion React handlers without a
+   * useful href. Arm a short SPA bypass so the following pushState is allowed
+   * in-tab instead of forced into a new tab.
+   */
+  function onPointerDownSoftArm(e) {
+    if (!isSoftMode() || !readIsLocked()) return;
+    if (e.button != null && e.button !== 0) return;
+    var t = e.target;
+    if (!t || isOurUi(t)) return;
+    if (isSoftAllowedInTabNavigation(t)) {
+      armSpaBypass();
+    }
+  }
+
   // Install as early as possible (@run-at document-start).
   document.addEventListener('click', onClickCapture, true);
+  document.addEventListener('pointerdown', onPointerDownSoftArm, true);
 
   // ---------------------------------------------------------------------------
   // SPA navigation guard (pushState / replaceState / popstate)
@@ -1164,8 +1449,13 @@
     if (!GUARD_SPA_NAVIGATION) return false;
     if (!readIsLocked() || restoringHome) return false;
     if (url == null || url === '') return false;
+    if (isSoftMode() && hasSpaBypass()) {
+      log('SPA bypass: allow history mutation', url);
+      return null;
+    }
     var abs = resolveAbsoluteUrl(String(url), location.href);
-    return shouldOpenDestination(abs) ? abs : null;
+    // No click source for history — soft collection exemption is via bypass.
+    return shouldOpenDestination(abs, null) ? abs : null;
   }
 
   function blockHistoryAndOpen(abs) {
@@ -1248,7 +1538,7 @@
 
     e.preventDefault();
     e.stopPropagation();
-    toggleLock();
+    cycleLock();
   }
 
   window.addEventListener('keydown', onKeyDown, true);
@@ -1260,5 +1550,14 @@
   clearLegacyTitleLockPrefix();
   watchLauncherUiSurvival();
   syncChromeUi();
-  log('Initialized; locked=', readIsLocked(), 'url=', readLockedUrl(), 'ui=', getUiVariant());
+
+  // Announce once so Zen/AdGuard injection can be verified in DevTools.
+  try {
+    console.info(
+      '[Notion Locked Launcher] v1.5.1 active — Cmd+Shift+L cycles Soft → Strict → Off; now=' +
+        readLockMode()
+    );
+  } catch (eBoot) { /* ignore */ }
+
+  log('Initialized; mode=', readLockMode(), 'url=', readLockedUrl(), 'ui=', getUiVariant());
 })();
