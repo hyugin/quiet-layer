@@ -10,7 +10,26 @@ AdGuard for Mac is **not** a browser extension; scripts may need updates if a si
 | --- | --- |
 | [`notion-favicon-lock.user.js`](./notion-favicon-lock.user.js) | Keep the Notion tab favicon locked to the default Notion logo |
 | [`notion-locked-launcher.user.js`](./notion-locked-launcher.user.js) | Lock a Notion tab as a launcher: nav links open in new tabs; the locked tab stays put |
+| [`notion-tab-local-sidebar.user.js`](./notion-tab-local-sidebar.user.js) | Keep sidebar open/closed state **per tab** (stops localStorage syncing across tabs) |
 | [`stay-put.user.js`](./stay-put.user.js) | **Stay Put** — on allowlisted apps (GitHub / Jira / Notion), same-origin links always open in a new tab; this tab stays put |
+
+### Notion Tab-Local Sidebar
+
+Notion saves left-nav open/closed (+ width) in `localStorage` under `LRU:KeyValueStore2:sidebar` (and the comments/updates panel under `LRU:KeyValueStore2:updateSidebar`). That storage is shared by every Notion tab, so toggling the sidebar in one tab changes what other tabs load on refresh.
+
+This script redirects those keys to **`sessionStorage`** (tab-scoped) and never writes them back to `localStorage`.
+
+1. Paste [`notion-tab-local-sidebar.user.js`](./notion-tab-local-sidebar.user.js) into AdGuard → **Extensions** → **+**
+2. Enable **HTTPS filtering** for `notion.com` / `notion.so`
+3. Fully close all Notion tabs, open two fresh ones
+4. Open the sidebar in tab A, refresh tab B — tab B should keep its own state
+
+Console line when injected: `[Notion Tab-Local Sidebar] v1.0.0 active — sidebar state is per-tab`
+
+Optional config near the top of the script:
+
+- `INCLUDE_RIGHT_SIDEBAR` (default `true`) — also isolate comments/updates sidebar state
+- `DEBUG` (default `false`) — log redirected get/set calls
 
 ### Stay Put
 
